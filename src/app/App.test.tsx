@@ -1,9 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { AppShell } from '../components/AppShell'
+
+vi.mock('../api/marketOverview', () => ({
+  fetchMarketOverview: vi.fn(() => new Promise(() => undefined)),
+}))
 
 function renderShell(path = '/') {
   return render(
@@ -41,5 +45,14 @@ describe('AppShell', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: '回测' })).toBeInTheDocument()
+  })
+
+  it('keeps the market overview route addressable after a direct load', () => {
+    window.history.pushState({}, '', '/market')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: '市场概览' })).toBeInTheDocument()
+    expect(screen.getByText('正在请求 /api/v1/markets/overview')).toBeInTheDocument()
   })
 })
