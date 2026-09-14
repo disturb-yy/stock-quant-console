@@ -305,6 +305,12 @@ a {
   color: var(--body);
 }
 
+.page-state__diagnostic {
+  color: var(--muted);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
 .page-state .t-empty {
   padding: 12px 0;
 }

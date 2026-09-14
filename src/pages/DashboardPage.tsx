@@ -1,13 +1,14 @@
 import { CheckCircleFilledIcon, RefreshIcon, ServerIcon } from 'tdesign-icons-react'
 import { Button, Card, Tag } from 'tdesign-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isApiAbortError } from '../api/client'
 import { fetchHealth, type HealthResponse } from '../api/health'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
 
 type HealthState =
   | { status: 'loading' }
   | { status: 'success'; data: HealthResponse; checkedAt: Date }
-  | { status: 'error'; message: string }
+  | { status: 'error'; error: unknown }
 
 function useHealth() {
   const [state, setState] = useState<HealthState>({ status: 'loading' })
@@ -23,9 +24,9 @@ function useHealth() {
         if (controllerRef.current === controller) setState({ status: 'success', data, checkedAt: new Date() })
       })
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
+        if (isApiAbortError(error)) return
         if (controllerRef.current === controller) {
-          setState({ status: 'error', message: error instanceof Error ? error.message : '健康检查失败' })
+          setState({ status: 'error', error })
         }
       })
   }, [])
@@ -40,7 +41,7 @@ function useHealth() {
 
 function HealthPanel({ state, onRetry }: { state: HealthState; onRetry: () => void }) {
   if (state.status === 'loading') return <LoadingState label="正在请求 /api/v1/health" />
-  if (state.status === 'error') return <ErrorState description={state.message} onRetry={onRetry} />
+  if (state.status === 'error') return <ErrorState error={state.error} onRetry={onRetry} />
 
   return (
     <div className="health-result">
