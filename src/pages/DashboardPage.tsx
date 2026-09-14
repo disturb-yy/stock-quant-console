@@ -118,9 +118,9 @@ const modePresentation = {
 } satisfies Record<DemoStatus['mode'], { label: string; description: string; theme: 'warning' | 'success' }>
 
 const countItems: ReadonlyArray<{ key: keyof DemoStatus['counts']; label: string }> = [
-  { key: 'instruments', label: 'Instrument' },
-  { key: 'daily_bars', label: 'Daily Bar' },
-  { key: 'financial_metrics', label: 'Financial Metric' },
+  { key: 'instruments', label: '股票标的' },
+  { key: 'daily_bars', label: '日 K 线' },
+  { key: 'financial_metrics', label: '财务指标' },
 ]
 
 function demoStatusErrorHint(error: unknown) {

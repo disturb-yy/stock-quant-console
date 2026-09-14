@@ -114,6 +114,9 @@ describe('DashboardPage demo status states', () => {
     expect(screen.getByText('fnd-003-demo-v1')).toBeInTheDocument()
     expect(screen.getByText('2024-06-28')).toBeInTheDocument()
     expect(screen.getByText('平安银行')).toBeInTheDocument()
+    expect(screen.getByText('股票标的')).toBeInTheDocument()
+    expect(screen.getByText('日 K 线')).toBeInTheDocument()
+    expect(screen.getByText('财务指标')).toBeInTheDocument()
     expect(screen.getByText(/不是实时\/真实行情/)).toBeInTheDocument()
   })
 
