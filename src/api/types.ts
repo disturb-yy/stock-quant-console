@@ -10,9 +10,12 @@ export type {
   MarketDataSource,
   MarketIndex,
   MarketOverview,
+  MarketSector,
+  MarketSectors,
   MarketTurnover,
   PaginatedResponse,
   PaginationMeta,
   PaginationRequest,
   Response,
+  SectorLeader,
 } from './generated'

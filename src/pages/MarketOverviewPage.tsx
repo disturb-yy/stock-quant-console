@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card } from 'tdesign-react'
+import { useSearchParams } from 'react-router-dom'
 import { isApiAbortError } from '../api/client'
 import { fetchMarketOverview, type MarketDataSource, type MarketIndex, type MarketOverview } from '../api/marketOverview'
+import { fetchMarketSectors, type MarketSector, type MarketSectors } from '../api/marketSectors'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
 
 type MarketOverviewState =
@@ -83,10 +85,213 @@ function getSourceLabel(source: MarketDataSource) {
   return 'Seed 数据'
 }
 
+export type SectorSort = 'gainers' | 'losers'
+export type SectorFilter = 'all' | 'up' | 'down' | 'flat'
+
+const defaultSectorSort: SectorSort = 'gainers'
+const defaultSectorFilter: SectorFilter = 'all'
+
+function isSectorSort(value: string | null): value is SectorSort {
+  return value === 'gainers' || value === 'losers'
+}
+
+function isSectorFilter(value: string | null): value is SectorFilter {
+  return value === 'all' || value === 'up' || value === 'down' || value === 'flat'
+}
+
+function readSectorQuery(searchParams: URLSearchParams) {
+  return {
+    sort: isSectorSort(searchParams.get('sector_sort')) ? searchParams.get('sector_sort') as SectorSort : defaultSectorSort,
+    filter: isSectorFilter(searchParams.get('sector_filter')) ? searchParams.get('sector_filter') as SectorFilter : defaultSectorFilter,
+  }
+}
+
+function changeValue(value: string) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function sectorTrend(value: string): Exclude<SectorFilter, 'all'> {
+  const number = changeValue(value)
+  if (number === null || number === 0) return 'flat'
+  return number > 0 ? 'up' : 'down'
+}
+
+function sortSectors(sectors: ReadonlyArray<MarketSector>, sort: SectorSort) {
+  return [...sectors].sort((left, right) => {
+    const leftValue = changeValue(left.change_percent)
+    const rightValue = changeValue(right.change_percent)
+    if (leftValue === null && rightValue !== null) return 1
+    if (leftValue !== null && rightValue === null) return -1
+    if (leftValue !== null && rightValue !== null && leftValue !== rightValue) {
+      return sort === 'gainers' ? rightValue - leftValue : leftValue - rightValue
+    }
+    return left.name.localeCompare(right.name, 'zh-CN')
+  })
+}
+
+function selectSectors(sectors: ReadonlyArray<MarketSector>, sort: SectorSort, filter: SectorFilter) {
+  const filtered = filter === 'all' ? sectors : sectors.filter((sector) => sectorTrend(sector.change_percent) === filter)
+  return sortSectors(filtered, sort)
+}
+
+type MarketSectorsState =
+  | { status: 'loading' }
+  | { status: 'success'; data: MarketSectors }
+  | { status: 'empty' }
+  | { status: 'error'; error: unknown }
+
+function useMarketSectors() {
+  const [reloadKey, setReloadKey] = useState(0)
+  const [state, setState] = useState<MarketSectorsState>({ status: 'loading' })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setState({ status: 'loading' })
+    fetchMarketSectors(controller.signal)
+      .then((data) => setState(data.sectors.length === 0 ? { status: 'empty' } : { status: 'success', data }))
+      .catch((error: unknown) => {
+        if (!isApiAbortError(error)) setState({ status: 'error', error })
+      })
+
+    return () => controller.abort()
+  }, [reloadKey])
+
+  return { state, retry: () => setReloadKey((value) => value + 1) }
+}
+
+function SectorControls({
+  sort,
+  filter,
+  onSortChange,
+  onFilterChange,
+}: {
+  sort: SectorSort
+  filter: SectorFilter
+  onSortChange: (value: SectorSort) => void
+  onFilterChange: (value: SectorFilter) => void
+}) {
+  return (
+    <div className="market-sector-controls" aria-label="行业表现排序与筛选">
+      <label className="market-sector-control">
+        <span>排序</span>
+        <select aria-label="行业排序" value={sort} onChange={(event) => onSortChange(event.target.value as SectorSort)}>
+          <option value="gainers">涨幅优先</option>
+          <option value="losers">跌幅优先</option>
+        </select>
+      </label>
+      <label className="market-sector-control">
+        <span>涨跌筛选</span>
+        <select aria-label="行业涨跌筛选" value={filter} onChange={(event) => onFilterChange(event.target.value as SectorFilter)}>
+          <option value="all">全部行业</option>
+          <option value="up">上涨</option>
+          <option value="down">下跌</option>
+          <option value="flat">平盘</option>
+        </select>
+      </label>
+    </div>
+  )
+}
+
+function SectorTrend({ value }: { value: string }) {
+  const trend = sectorTrend(value)
+  const symbol = trend === 'up' ? '▲' : trend === 'down' ? '▼' : '—'
+  return (
+    <span className={`market-sector-trend market-sector-trend--${trend}`}>
+      <span aria-hidden="true">{symbol}</span>
+      <span>{formatSignedNumber(value, '%')}</span>
+      <span className="market-sector-trend__label">{getTrendLabel(value)}</span>
+    </span>
+  )
+}
+
+function SectorTable({ sectors }: { sectors: ReadonlyArray<MarketSector> }) {
+  return (
+    <div className="market-sector-table-wrap">
+      <table className="market-sector-table">
+        <caption className="sr-only">行业表现，包含等权日收益、成分数量与领涨股票</caption>
+        <thead>
+          <tr>
+            <th scope="col">行业</th>
+            <th scope="col">等权日收益</th>
+            <th scope="col">成分数量</th>
+            <th scope="col">领涨股票</th>
+            <th scope="col">领涨股涨跌幅</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sectors.map((sector) => (
+            <tr key={sector.code}>
+              <th scope="row">
+                <span className="market-sector-name">{sector.name}</span>
+                <code>{sector.code}</code>
+              </th>
+              <td><SectorTrend value={sector.change_percent} /></td>
+              <td className="market-sector-table__number">{sector.component_count.toLocaleString('zh-CN')}</td>
+              <td>
+                <span className="market-sector-leader__name">{sector.leader.name}</span>
+                <code>{sector.leader.code}</code>
+              </td>
+              <td><SectorTrend value={sector.leader.change_percent} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MarketSectorsSection() {
+  const { state, retry } = useMarketSectors()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const query = readSectorQuery(searchParams)
+  const sectors = useMemo(
+    () => state.status === 'success' ? selectSectors(state.data.sectors, query.sort, query.filter) : [],
+    [query.filter, query.sort, state],
+  )
+
+  function updateQuery(next: Partial<typeof query>) {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('sector_sort', next.sort ?? query.sort)
+    nextParams.set('sector_filter', next.filter ?? query.filter)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  return (
+    <section className="market-section market-sector-section" aria-labelledby="market-sectors-title">
+      <div className="market-section-heading market-sector-heading">
+        <div>
+          <p className="market-section-kicker">SECTOR PERFORMANCE</p>
+          <h2 id="market-sectors-title">行业表现</h2>
+        </div>
+        {state.status === 'success' ? (
+          <div className="market-sector-heading__meta">
+            <span className="market-section-meta">数据日期 <time dateTime={state.data.as_of}>{state.data.as_of}</time></span>
+            <span className="market-sector-source">{getSourceLabel(state.data.source)} · {state.data.source.seed_version}</span>
+          </div>
+        ) : null}
+      </div>
+      {state.status === 'loading' ? <Card className="market-card market-state-card market-sector-card" bordered><LoadingState label="正在请求 /api/v1/markets/sectors" /></Card> : null}
+      {state.status === 'empty' ? <Card className="market-card market-state-card market-sector-card" bordered><EmptyState description="接口已返回，但当前没有可展示的行业表现。" onRetry={retry} /></Card> : null}
+      {state.status === 'error' ? (
+        <Card className="market-card market-state-card market-sector-card" bordered>
+          <ErrorState error={state.error} hint="行业表现暂时无法加载，市场概览仍可继续使用；请确认后端服务和 Vite 代理可用后重试。" onRetry={retry} />
+        </Card>
+      ) : null}
+      {state.status === 'success' ? (
+        <Card className="market-card market-sector-card" bordered>
+          <SectorControls sort={query.sort} filter={query.filter} onSortChange={(sort) => updateQuery({ sort })} onFilterChange={(filter) => updateQuery({ filter })} />
+          {sectors.length === 0 ? <EmptyState description="当前筛选条件下没有行业表现。" /> : <SectorTable sectors={sectors} />}
+        </Card>
+      ) : null}
+    </section>
+  )
+}
+
 function IndexCard({ index }: { index: MarketIndex }) {
   const trend = getTrend(index.change_percent)
   return (
-    <Card className="market-index-card" bordered>
+    <Card className="market-card market-index-card" bordered>
       <div className="market-index-card__heading">
         <div>
           <h3>{index.name}</h3>
@@ -107,7 +312,7 @@ function IndexCard({ index }: { index: MarketIndex }) {
 
 function StatCard({ label, value, note, trend }: { label: string; value: string; note?: string; trend?: 'up' | 'down' | 'flat' }) {
   return (
-    <Card className="market-stat-card" bordered>
+    <Card className="market-card market-stat-card" bordered>
       <span className="market-stat-card__label">{label}</span>
       <strong className={trend ? `market-stat-card__value market-stat-card__value--${trend}` : 'market-stat-card__value'}>{value}</strong>
       {note ? <span className="market-stat-card__note">{note}</span> : null}
@@ -148,7 +353,7 @@ function MarketOverviewContent({ data }: { data: MarketOverview }) {
       </section>
 
       <section className="market-source-section" aria-labelledby="market-source-title">
-        <Card className="market-source-card" bordered>
+        <Card className="market-card market-source-card" bordered>
           <div className="market-source-card__heading">
             <div>
               <p className="market-section-kicker">DATA PROVENANCE</p>
@@ -194,10 +399,10 @@ export function MarketOverviewPage() {
         </div>
       </section>
 
-      {state.status === 'loading' ? <Card className="market-state-card" bordered><LoadingState label="正在请求 /api/v1/markets/overview" /></Card> : null}
-      {state.status === 'empty' ? <Card className="market-state-card" bordered><EmptyState description="接口已返回，但当前没有可展示的指数快照。" onRetry={retry} /></Card> : null}
+      {state.status === 'loading' ? <Card className="market-card market-state-card" bordered><LoadingState label="正在请求 /api/v1/markets/overview" /></Card> : null}
+      {state.status === 'empty' ? <Card className="market-card market-state-card" bordered><EmptyState description="接口已返回，但当前没有可展示的指数快照。" onRetry={retry} /></Card> : null}
       {state.status === 'error' ? (
-        <Card className="market-state-card" bordered>
+        <Card className="market-card market-state-card" bordered>
           <ErrorState
             error={state.error}
             hint="市场概览暂时无法加载，请确认后端服务和 Vite 代理可用后重试。"
@@ -206,6 +411,7 @@ export function MarketOverviewPage() {
         </Card>
       ) : null}
       {state.status === 'success' ? <MarketOverviewContent data={state.data} /> : null}
+      <MarketSectorsSection />
     </main>
   )
 }

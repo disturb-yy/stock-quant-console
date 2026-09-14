@@ -23,7 +23,7 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
 }
 
-function isMarketDataSource(value: unknown): value is MarketDataSource {
+export function isMarketDataSource(value: unknown): value is MarketDataSource {
   if (!isRecord(value)) return false
   return (value.mode === 'demo' || value.mode === 'real' || value.mode === 'fallback')
     && (value.provider === 'mysql-demo-fixture'

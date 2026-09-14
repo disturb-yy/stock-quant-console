@@ -9,6 +9,10 @@ vi.mock('../api/marketOverview', () => ({
   fetchMarketOverview: vi.fn(() => new Promise(() => undefined)),
 }))
 
+vi.mock('../api/marketSectors', () => ({
+  fetchMarketSectors: vi.fn(() => new Promise(() => undefined)),
+}))
+
 function renderShell(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
