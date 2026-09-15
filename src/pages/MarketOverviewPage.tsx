@@ -17,6 +17,7 @@ import {
 } from '../api/marketSignals'
 import { fetchMarketOverview, type MarketDataSource, type MarketIndex, type MarketOverview } from '../api/marketOverview'
 import { fetchMarketSectors, type MarketSector, type MarketSectors } from '../api/marketSectors'
+import { MarketRankingsSection } from '../components/MarketRankingsSection'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
 
 type MarketOverviewState =
@@ -685,6 +686,7 @@ export function MarketOverviewPage() {
         </Card>
       ) : null}
       {state.status === 'success' ? <MarketOverviewContent data={state.data} /> : null}
+      <MarketRankingsSection />
       <MarketSignalsSection />
       <MarketSectorsSection />
     </main>

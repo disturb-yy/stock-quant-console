@@ -21,6 +21,11 @@ vi.mock('../api/marketSignals', () => ({
   signalWindows: [20, 60, 120],
 }))
 
+vi.mock('../api/marketRankings', () => ({
+  fetchMarketRankings: vi.fn(() => new Promise(() => undefined)),
+  rankingMetrics: ['gain', 'loss', 'turnover_amount', 'turnover_rate'],
+}))
+
 function renderShell(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>

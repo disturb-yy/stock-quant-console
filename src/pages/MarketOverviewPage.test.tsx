@@ -24,6 +24,11 @@ vi.mock('../api/marketSignals', () => ({
   signalWindows: [20, 60, 120],
 }))
 
+vi.mock('../api/marketRankings', () => ({
+  fetchMarketRankings: vi.fn(() => new Promise(() => undefined)),
+  rankingMetrics: ['gain', 'loss', 'turnover_amount', 'turnover_rate'],
+}))
+
 const overview = {
   as_of: '2024-06-28',
   observed_at: '2024-06-28T07:00:00Z',
@@ -128,7 +133,7 @@ describe('MarketOverviewPage', () => {
     expect(screen.getByText('沪深300')).toBeInTheDocument()
     expect(screen.getByText('上涨家数')).toBeInTheDocument()
     expect(screen.getByText('下跌家数')).toBeInTheDocument()
-    expect(screen.getByText('成交额')).toBeInTheDocument()
+    expect(screen.getByText('成交额', { selector: '.market-stat-card__label' })).toBeInTheDocument()
     expect(screen.getByText('2024-06-28T07:00:00Z')).toBeInTheDocument()
     expect(screen.getByText('mysql-demo-fixture')).toBeInTheDocument()
     expect(screen.getByText('fnd-003-demo-v2')).toBeInTheDocument()

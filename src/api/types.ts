@@ -10,6 +10,8 @@ export type {
   MarketDataSource,
   MarketIndex,
   MarketOverview,
+  MarketRanking,
+  MarketRankings,
   MarketSector,
   MarketSectors,
   MarketSignals,
