@@ -2,6 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card } from 'tdesign-react'
 import { useSearchParams } from 'react-router-dom'
 import { isApiAbortError } from '../api/client'
+import {
+  fetchMarketSignals,
+  signalMultiples,
+  signalTopPercents,
+  signalTypes,
+  signalWindows,
+  type MarketSignals,
+  type SignalMultiple,
+  type SignalParameters,
+  type SignalTopPercent,
+  type SignalType,
+  type SignalWindow,
+} from '../api/marketSignals'
 import { fetchMarketOverview, type MarketDataSource, type MarketIndex, type MarketOverview } from '../api/marketOverview'
 import { fetchMarketSectors, type MarketSector, type MarketSectors } from '../api/marketSectors'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
@@ -83,6 +96,80 @@ function getSourceLabel(source: MarketDataSource) {
   if (source.mode === 'real') return '真实 Provider'
   if (source.mode === 'fallback') return '本地回退数据'
   return 'Seed 数据'
+}
+
+const signalLabels: Record<SignalType, string> = {
+  volume_surge: '放量',
+  breakout: '突破',
+  new_high: '新高',
+  strong: '强势',
+}
+
+const signalDescriptions: Record<SignalType, string> = {
+  volume_surge: '成交量达到窗口均值倍数',
+  breakout: '收盘价突破窗口高点',
+  new_high: '创窗口期内新高',
+  strong: '收益率进入排名前列',
+}
+
+const defaultSignalType: SignalType = 'volume_surge'
+const defaultSignalWindow: SignalWindow = 20
+const defaultSignalMultiple: SignalMultiple = 1.5
+const defaultSignalTopPercent: SignalTopPercent = 10
+
+type SignalQuery = {
+  type: SignalType
+  window: SignalWindow
+  multiple: SignalMultiple
+  topPercent: SignalTopPercent
+  invalid: ReadonlyArray<string>
+}
+
+function readSignalQuery(searchParams: URLSearchParams): SignalQuery {
+  const invalid: string[] = []
+  const rawType = searchParams.get('signal_type')
+  const type = rawType !== null && signalTypes.includes(rawType as SignalType)
+    ? rawType as SignalType
+    : defaultSignalType
+  if (rawType !== null && type === defaultSignalType && rawType !== defaultSignalType) invalid.push('signal_type')
+
+  function readNumber<T extends number>(key: string, options: readonly T[], fallback: T): T {
+    const raw = searchParams.get(key)
+    if (raw === null) return fallback
+    const value = Number(raw)
+    if (options.includes(value as T)) return value as T
+    invalid.push(key)
+    return fallback
+  }
+
+  return {
+    type,
+    window: readNumber('signal_window', signalWindows, defaultSignalWindow),
+    multiple: readNumber('signal_multiple', signalMultiples, defaultSignalMultiple),
+    topPercent: readNumber('signal_top_percent', signalTopPercents, defaultSignalTopPercent),
+    invalid,
+  }
+}
+
+function buildSignalParams(query: SignalQuery): SignalParameters {
+  const params: SignalParameters = { window: query.window }
+  if (query.type === 'volume_surge') return { ...params, multiple: query.multiple }
+  if (query.type === 'strong') return { ...params, top_percent: query.topPercent }
+  return params
+}
+
+function formatSignalParams(type: SignalType, params: SignalParameters) {
+  const window = params.window === undefined ? '默认窗口' : `${params.window} 日`
+  if (type === 'volume_surge') return `窗口 ${window} · 成交量倍数 ${params.multiple ?? '默认'}x`
+  if (type === 'strong') return `窗口 ${window} · 收益率前 ${params.top_percent ?? '默认'}%`
+  return `窗口 ${window}`
+}
+
+function signalContext(signal: SignalType, params: SignalParameters) {
+  if (signal === 'volume_surge') return `窗口 ${params.window ?? '默认'} 日，成交量达到 ${params.multiple ?? '默认'}x`
+  if (signal === 'strong') return `窗口 ${params.window ?? '默认'} 日，收益率排名前 ${params.top_percent ?? '默认'}%`
+  if (signal === 'breakout') return `收盘价突破 ${params.window ?? '默认'} 日窗口高点`
+  return `创 ${params.window ?? '默认'} 日窗口新高`
 }
 
 export type SectorSort = 'gainers' | 'losers'
@@ -288,6 +375,193 @@ function MarketSectorsSection() {
   )
 }
 
+type MarketSignalsState =
+  | { status: 'loading' }
+  | { status: 'success'; data: MarketSignals }
+  | { status: 'empty' }
+  | { status: 'error'; error: unknown }
+
+function useMarketSignals(query: SignalQuery) {
+  const [reloadKey, setReloadKey] = useState(0)
+  const [state, setState] = useState<MarketSignalsState>({ status: 'loading' })
+
+  useEffect(() => {
+    if (query.invalid.length > 0) {
+      setState({ status: 'loading' })
+      return
+    }
+
+    const controller = new AbortController()
+    setState({ status: 'loading' })
+    fetchMarketSignals({ type: query.type, params: buildSignalParams(query) }, controller.signal)
+      .then((data) => setState(data.signals.length === 0 ? { status: 'empty' } : { status: 'success', data }))
+      .catch((error: unknown) => {
+        if (!isApiAbortError(error)) setState({ status: 'error', error })
+      })
+
+    return () => controller.abort()
+  }, [query.invalid.length, query.multiple, query.topPercent, query.type, query.window, reloadKey])
+
+  return { state, retry: () => setReloadKey((value) => value + 1) }
+}
+
+function SignalControls({
+  query,
+  onTypeChange,
+  onWindowChange,
+  onMultipleChange,
+  onTopPercentChange,
+}: {
+  query: SignalQuery
+  onTypeChange: (value: SignalType) => void
+  onWindowChange: (value: SignalWindow) => void
+  onMultipleChange: (value: SignalMultiple) => void
+  onTopPercentChange: (value: SignalTopPercent) => void
+}) {
+  return (
+    <div className="market-signal-controls">
+      <div className="market-signal-tabs" role="tablist" aria-label="市场信号类型">
+        {signalTypes.map((type) => (
+          <button
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={query.type === type}
+            className={query.type === type ? 'market-signal-tab market-signal-tab--active' : 'market-signal-tab'}
+            onClick={() => onTypeChange(type)}
+          >
+            {signalLabels[type]}
+          </button>
+        ))}
+      </div>
+      <div className="market-signal-filters" aria-label="市场信号参数">
+        <label className="market-signal-control">
+          <span>历史窗口</span>
+          <select aria-label="信号历史窗口" value={query.window} onChange={(event) => onWindowChange(Number(event.target.value) as SignalWindow)}>
+            {signalWindows.map((value) => <option key={value} value={value}>{value} 日</option>)}
+          </select>
+        </label>
+        {query.type === 'volume_surge' ? (
+          <label className="market-signal-control">
+            <span>成交量倍数</span>
+            <select aria-label="成交量倍数" value={query.multiple} onChange={(event) => onMultipleChange(Number(event.target.value) as SignalMultiple)}>
+              {signalMultiples.map((value) => <option key={value} value={value}>{value}x</option>)}
+            </select>
+          </label>
+        ) : null}
+        {query.type === 'strong' ? (
+          <label className="market-signal-control">
+            <span>收益率排名</span>
+            <select aria-label="收益率排名" value={query.topPercent} onChange={(event) => onTopPercentChange(Number(event.target.value) as SignalTopPercent)}>
+              {signalTopPercents.map((value) => <option key={value} value={value}>前 {value}%</option>)}
+            </select>
+          </label>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function SignalTable({ data }: { data: MarketSignals }) {
+  return (
+    <div className="market-signal-table-wrap">
+      <table className="market-signal-table">
+        <caption className="sr-only">市场信号结果，包含股票代码、名称、信号类型和参数上下文</caption>
+        <thead>
+          <tr>
+            <th scope="col">股票代码</th>
+            <th scope="col">股票名称</th>
+            <th scope="col">信号</th>
+            <th scope="col">信号上下文</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.signals.map((signal) => (
+            <tr key={`${signal.code}-${signal.signal}`}>
+              <th scope="row"><code>{signal.code}</code></th>
+              <td className="market-signal-table__name">{signal.name}</td>
+              <td>
+                <span className={`market-signal-badge market-signal-badge--${signal.signal}`}>
+                  <span aria-hidden="true">◆</span>
+                  <span>{signalLabels[signal.signal]}</span>
+                </span>
+              </td>
+              <td>{signalDescriptions[signal.signal]} · {signalContext(signal.signal, data.params)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MarketSignalsSection() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const query = readSignalQuery(searchParams)
+  const { state, retry } = useMarketSignals(query)
+
+  function updateQuery(next: Partial<Pick<SignalQuery, 'type' | 'window' | 'multiple' | 'topPercent'>>) {
+    const nextQuery = { ...query, ...next }
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('signal_type', nextQuery.type)
+    nextParams.set('signal_window', String(nextQuery.window))
+    nextParams.set('signal_multiple', String(nextQuery.multiple))
+    nextParams.set('signal_top_percent', String(nextQuery.topPercent))
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function resetInvalidQuery() {
+    const nextParams = new URLSearchParams(searchParams)
+    for (const key of ['signal_type', 'signal_window', 'signal_multiple', 'signal_top_percent']) nextParams.delete(key)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  return (
+    <section className="market-section market-signal-section" aria-labelledby="market-signals-title">
+      <div className="market-section-heading market-signal-heading">
+        <div>
+          <p className="market-section-kicker">MARKET SIGNALS</p>
+          <h2 id="market-signals-title">市场信号</h2>
+        </div>
+        {state.status === 'success' ? (
+          <div className="market-signal-heading__meta">
+            <span className="market-section-meta">数据日期 <time dateTime={state.data.as_of}>{state.data.as_of}</time></span>
+            <span className="market-signal-params">实际参数 · {formatSignalParams(state.data.type, state.data.params)}</span>
+            <span className="market-signal-source">{getSourceLabel(state.data.source)} · {state.data.source.provider} · {state.data.source.seed_version}</span>
+          </div>
+        ) : null}
+      </div>
+      <Card className="market-card market-signal-card" bordered>
+        <SignalControls
+          query={query}
+          onTypeChange={(type) => updateQuery({ type })}
+          onWindowChange={(window) => updateQuery({ window })}
+          onMultipleChange={(multiple) => updateQuery({ multiple })}
+          onTopPercentChange={(topPercent) => updateQuery({ topPercent })}
+        />
+        {query.invalid.length > 0 ? (
+          <ErrorState
+            description="URL 中的市场信号参数无效"
+            hint={`请检查参数：${query.invalid.join('、')}。恢复默认参数后会重新请求真实接口。`}
+            actionLabel="恢复默认参数"
+            onRetry={resetInvalidQuery}
+          />
+        ) : null}
+        {query.invalid.length === 0 && state.status === 'loading' ? <LoadingState label="正在请求 /api/v1/markets/signals" /> : null}
+        {query.invalid.length === 0 && state.status === 'empty' ? <EmptyState description="接口已返回，但当前参数下没有市场信号。" onRetry={retry} /> : null}
+        {query.invalid.length === 0 && state.status === 'error' ? (
+          <ErrorState
+            error={state.error}
+            hint="市场信号暂时无法加载，请检查后端服务和 Vite 代理后重试。"
+            onRetry={retry}
+          />
+        ) : null}
+        {query.invalid.length === 0 && state.status === 'success' ? <SignalTable data={state.data} /> : null}
+      </Card>
+    </section>
+  )
+}
+
 function IndexCard({ index }: { index: MarketIndex }) {
   const trend = getTrend(index.change_percent)
   return (
@@ -411,6 +685,7 @@ export function MarketOverviewPage() {
         </Card>
       ) : null}
       {state.status === 'success' ? <MarketOverviewContent data={state.data} /> : null}
+      <MarketSignalsSection />
       <MarketSectorsSection />
     </main>
   )

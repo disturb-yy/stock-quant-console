@@ -25,8 +25,9 @@ export function ErrorState({
   error,
   description,
   hint,
+  actionLabel = '重新检查',
   onRetry,
-}: { error?: unknown; description?: string; hint?: string; onRetry?: () => void }) {
+}: { error?: unknown; description?: string; hint?: string; actionLabel?: string; onRetry?: () => void }) {
   const display = error === undefined
     ? { message: description ?? '请求失败', diagnostic: '' }
     : describeApiError(error, formatBackendApiError)
@@ -37,7 +38,7 @@ export function ErrorState({
       {hint ? <p className="page-state__hint">{hint}</p> : null}
       {onRetry ? (
         <Button theme="primary" onClick={onRetry}>
-          重新检查
+          {actionLabel}
         </Button>
       ) : null}
     </div>

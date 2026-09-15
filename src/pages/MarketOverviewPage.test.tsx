@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import { fetchMarketOverview } from '../api/marketOverview'
 import { fetchMarketSectors } from '../api/marketSectors'
+import { fetchMarketSignals } from '../api/marketSignals'
 import { MarketOverviewPage } from './MarketOverviewPage'
 
 vi.mock('../api/marketOverview', () => ({
@@ -13,6 +14,14 @@ vi.mock('../api/marketOverview', () => ({
 
 vi.mock('../api/marketSectors', () => ({
   fetchMarketSectors: vi.fn(),
+}))
+
+vi.mock('../api/marketSignals', () => ({
+  fetchMarketSignals: vi.fn(),
+  signalMultiples: [1.5, 2],
+  signalTopPercents: [10, 20],
+  signalTypes: ['volume_surge', 'breakout', 'new_high', 'strong'],
+  signalWindows: [20, 60, 120],
 }))
 
 const overview = {
@@ -66,6 +75,18 @@ const sectors = {
 
 const fetchMarketOverviewMock = vi.mocked(fetchMarketOverview)
 const fetchMarketSectorsMock = vi.mocked(fetchMarketSectors)
+const fetchMarketSignalsMock = vi.mocked(fetchMarketSignals)
+
+const marketSignals = {
+  type: 'volume_surge' as const,
+  params: { window: 20 as const, multiple: 1.5 as const },
+  as_of: '2024-06-28',
+  source: { mode: 'demo' as const, provider: 'mysql-demo-fixture' as const, seed_version: 'fnd-003-demo-v4' },
+  signals: [
+    { code: '000001.SZ', name: '平安银行', signal: 'volume_surge' as const },
+    { code: '300750.SZ', name: '宁德时代', signal: 'volume_surge' as const },
+  ],
+}
 
 function LocationProbe() {
   const location = useLocation()
@@ -85,6 +106,7 @@ describe('MarketOverviewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     fetchMarketSectorsMock.mockReturnValue(new Promise(() => undefined))
+    fetchMarketSignalsMock.mockReturnValue(new Promise(() => undefined))
   })
 
   it('shows loading while the real market endpoint is pending', () => {
@@ -259,5 +281,118 @@ describe('MarketOverviewPage', () => {
     expect(rows[1].textContent).toContain('食品饮料')
     expect(screen.getByRole('combobox', { name: '行业排序' })).toHaveValue('losers')
     expect(screen.getByRole('combobox', { name: '行业涨跌筛选' })).toHaveValue('down')
+  })
+
+  it('shows signal rows, actual parameters, observation date, source, and no fake actions', async () => {
+    fetchMarketOverviewMock.mockResolvedValue(overview)
+    fetchMarketSignalsMock.mockResolvedValue(marketSignals)
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: '市场信号' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '放量' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('平安银行')).toBeInTheDocument()
+    expect(screen.getByText('300750.SZ')).toBeInTheDocument()
+    expect(screen.getAllByText('成交量达到窗口均值倍数 · 窗口 20 日，成交量达到 1.5x')).toHaveLength(2)
+    expect(screen.getByText('实际参数 · 窗口 20 日 · 成交量倍数 1.5x')).toBeInTheDocument()
+    expect(screen.getByText('Seed 数据 · mysql-demo-fixture · fnd-003-demo-v4')).toBeInTheDocument()
+    expect(screen.queryByText(/Coming Soon/i)).not.toBeInTheDocument()
+    expect(screen.getByText('平安银行').closest('a')).toBeNull()
+  })
+
+  it('shows signal loading while the real endpoint is pending', async () => {
+    fetchMarketOverviewMock.mockResolvedValue(overview)
+    fetchMarketSignalsMock.mockReturnValue(new Promise(() => undefined))
+
+    renderPage()
+
+    expect(await screen.findByText('正在请求 /api/v1/markets/signals')).toBeInTheDocument()
+  })
+
+  it('shows an empty signal state and retries the same request', async () => {
+    const user = userEvent.setup()
+    fetchMarketOverviewMock.mockResolvedValue(overview)
+    fetchMarketSignalsMock.mockResolvedValueOnce({ ...marketSignals, signals: [] }).mockResolvedValueOnce(marketSignals)
+
+    renderPage()
+
+    expect(await screen.findByText('接口已返回，但当前参数下没有市场信号。')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重新获取' }))
+
+    expect(await screen.findByText('300750.SZ')).toBeInTheDocument()
+    expect(fetchMarketSignalsMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows a signal error and retries to success', async () => {
+    const user = userEvent.setup()
+    fetchMarketOverviewMock.mockResolvedValue(overview)
+    fetchMarketSignalsMock.mockRejectedValueOnce(new ApiError('network', '无法连接 API 服务')).mockResolvedValueOnce(marketSignals)
+
+    renderPage()
+
+    expect(await screen.findByText(/市场信号暂时无法加载/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重新检查' }))
+
+    expect(await screen.findByText('实际参数 · 窗口 20 日 · 成交量倍数 1.5x')).toBeInTheDocument()
+    expect(fetchMarketSignalsMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('writes signal tabs and parameters to the URL and requests fresh data', async () => {
+    const user = userEvent.setup()
+    fetchMarketOverviewMock.mockResolvedValue(overview)
+    fetchMarketSignalsMock.mockImplementation(async (request) => ({
+      ...marketSignals,
+      type: request.type,
+      params: request.params,
+      signals: [{ code: '300750.SZ', name: '宁德时代', signal: request.type }],
+    }))
+
+    renderPage('/market?workspace=research')
+
+    await screen.findByText('实际参数 · 窗口 20 日 · 成交量倍数 1.5x')
+    await user.selectOptions(screen.getByRole('combobox', { name: '信号历史窗口' }), '60')
+    expect(screen.getByTestId('location-search')).toHaveTextContent('workspace=research')
+    expect(screen.getByTestId('location-search')).toHaveTextContent('signal_window=60')
+    expect(fetchMarketSignalsMock).toHaveBeenLastCalledWith(
+      { type: 'volume_surge', params: { window: 60, multiple: 1.5 } },
+      expect.any(AbortSignal),
+    )
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '成交量倍数' }), '2')
+    await user.click(screen.getByRole('tab', { name: '强势' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '收益率排名' }), '20')
+
+    expect(screen.getByTestId('location-search')).toHaveTextContent('signal_type=strong')
+    expect(screen.getByTestId('location-search')).toHaveTextContent('signal_window=60')
+    expect(screen.getByTestId('location-search')).toHaveTextContent('signal_multiple=2')
+    expect(screen.getByTestId('location-search')).toHaveTextContent('signal_top_percent=20')
+    expect(fetchMarketSignalsMock).toHaveBeenLastCalledWith(
+      { type: 'strong', params: { window: 60, top_percent: 20 } },
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('restores signal controls from a direct route and rejects illegal URL parameters', async () => {
+    fetchMarketOverviewMock.mockResolvedValue(overview)
+    fetchMarketSignalsMock.mockResolvedValue(marketSignals)
+
+    const restoredView = renderPage('/market?signal_type=strong&signal_window=120&signal_top_percent=20')
+
+    expect(await screen.findByText('实际参数 · 窗口 20 日 · 成交量倍数 1.5x')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '强势' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('combobox', { name: '信号历史窗口' })).toHaveValue('120')
+    expect(screen.getByRole('combobox', { name: '收益率排名' })).toHaveValue('20')
+    expect(fetchMarketSignalsMock).toHaveBeenCalledWith(
+      { type: 'strong', params: { window: 120, top_percent: 20 } },
+      expect.any(AbortSignal),
+    )
+
+    restoredView.unmount()
+    vi.clearAllMocks()
+    fetchMarketSignalsMock.mockReturnValue(new Promise(() => undefined))
+    renderPage('/market?signal_window=30')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('URL 中的市场信号参数无效')
+    expect(fetchMarketSignalsMock).not.toHaveBeenCalled()
   })
 })

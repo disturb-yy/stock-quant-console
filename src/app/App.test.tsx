@@ -13,6 +13,14 @@ vi.mock('../api/marketSectors', () => ({
   fetchMarketSectors: vi.fn(() => new Promise(() => undefined)),
 }))
 
+vi.mock('../api/marketSignals', () => ({
+  fetchMarketSignals: vi.fn(() => new Promise(() => undefined)),
+  signalMultiples: [1.5, 2],
+  signalTopPercents: [10, 20],
+  signalTypes: ['volume_surge', 'breakout', 'new_high', 'strong'],
+  signalWindows: [20, 60, 120],
+}))
+
 function renderShell(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>

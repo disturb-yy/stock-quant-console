@@ -12,10 +12,13 @@ export type {
   MarketOverview,
   MarketSector,
   MarketSectors,
+  MarketSignals,
   MarketTurnover,
   PaginatedResponse,
   PaginationMeta,
   PaginationRequest,
   Response,
   SectorLeader,
+  SignalParameters,
+  SignalResult,
 } from './generated'
