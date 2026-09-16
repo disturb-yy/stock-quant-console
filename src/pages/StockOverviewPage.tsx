@@ -1,15 +1,88 @@
 import { ArrowLeftIcon } from 'tdesign-icons-react'
 import { Button, Card } from 'tdesign-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { isApiError, isApiErrorResponse } from '../api/client'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ApiError, isApiAbortError, isApiError, isApiErrorResponse } from '../api/client'
+import {
+  chartAdjustments,
+  chartBenchmarks,
+  chartRanges,
+  fetchStockBars,
+  type ChartAdjustment,
+  type ChartBenchmark,
+  type ChartRange,
+  type StockBars,
+} from '../api/stockBars'
 import { fetchStockOverview, type StockMetric, type StockOverview, type StockSparklinePoint } from '../api/stockOverview'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
+import { StockResearchChart } from '../components/StockResearchChart'
 
 type StockOverviewState =
   | { status: 'loading' }
   | { status: 'success'; data: StockOverview }
   | { status: 'error'; error: unknown }
+
+type StockBarsState =
+  | { status: 'loading' }
+  | { status: 'success'; data: StockBars }
+  | { status: 'error'; error: unknown }
+
+const defaultChartRange: ChartRange = '120d'
+const defaultChartAdjustment: ChartAdjustment = 'none'
+const defaultChartBenchmark: ChartBenchmark = 'none'
+
+type StockChartQuery = {
+  range: ChartRange
+  adjust: ChartAdjustment
+  benchmark: ChartBenchmark
+  invalid: ReadonlyArray<string>
+}
+
+function readChartQuery(searchParams: URLSearchParams): StockChartQuery {
+  const invalid: string[] = []
+  const rawRange = searchParams.get('chart_range')
+  const range = chartRanges.includes(rawRange as ChartRange) ? rawRange as ChartRange : defaultChartRange
+  if (rawRange !== null && range === defaultChartRange && rawRange !== defaultChartRange) invalid.push('chart_range')
+
+  const rawAdjust = searchParams.get('chart_adjust')
+  const adjust = chartAdjustments.includes(rawAdjust as ChartAdjustment) ? rawAdjust as ChartAdjustment : defaultChartAdjustment
+  if (rawAdjust !== null && adjust === defaultChartAdjustment && rawAdjust !== defaultChartAdjustment) invalid.push('chart_adjust')
+
+  const rawBenchmark = searchParams.get('chart_benchmark')
+  const benchmark = chartBenchmarks.includes(rawBenchmark as ChartBenchmark) ? rawBenchmark as ChartBenchmark : defaultChartBenchmark
+  if (rawBenchmark !== null && benchmark === defaultChartBenchmark && rawBenchmark !== defaultChartBenchmark) invalid.push('chart_benchmark')
+
+  return { range, adjust, benchmark, invalid }
+}
+
+function useStockBars(symbol: string, query: StockChartQuery) {
+  const [reloadKey, setReloadKey] = useState(0)
+  const [state, setState] = useState<StockBarsState>({ status: 'loading' })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let current = true
+    setState({ status: 'loading' })
+    fetchStockBars(symbol, { range: query.range, adjust: query.adjust, benchmark: query.benchmark }, controller.signal)
+      .then((data) => {
+        if (data.symbol !== symbol || data.timeframe !== '1d' || data.adjust !== query.adjust
+          || (query.benchmark !== 'none' && data.benchmark === null)) {
+          throw new ApiError('invalid-payload', 'API 响应与行情查询不一致')
+        }
+        if (current) setState({ status: 'success', data })
+      })
+      .catch((error: unknown) => {
+        if (current && !isApiAbortError(error)) setState({ status: 'error', error })
+      })
+
+    return () => {
+      current = false
+      controller.abort()
+    }
+  }, [query.adjust, query.benchmark, query.range, reloadKey, symbol])
+
+  return { state, retry: () => setReloadKey((value) => value + 1) }
+}
 
 type Movement = 'up' | 'down' | 'flat'
 
@@ -263,6 +336,164 @@ function TrendCharts({ points }: { points: ReadonlyArray<StockSparklinePoint> })
   return <div className="stock-trend-grid"><ClosingLineChart points={numericPoints as NumericTrendPoint[]} /><CandlestickChart points={numericPoints as NumericTrendPoint[]} /></div>
 }
 
+const chartRangeLabels: Record<ChartRange, string> = {
+  '20d': '20 日',
+  '60d': '60 日',
+  '120d': '120 日',
+  all: '全部可用日线',
+}
+
+const chartAdjustmentLabels: Record<ChartAdjustment, string> = {
+  none: '不复权',
+  qfq: '前复权',
+  hfq: '后复权',
+}
+
+function StockChartControls({
+  query,
+  showMa5,
+  showMa20,
+  onRangeChange,
+  onAdjustmentChange,
+  onBenchmarkToggle,
+  onMa5Toggle,
+  onMa20Toggle,
+}: {
+  query: StockChartQuery
+  showMa5: boolean
+  showMa20: boolean
+  onRangeChange: (value: ChartRange) => void
+  onAdjustmentChange: (value: ChartAdjustment) => void
+  onBenchmarkToggle: () => void
+  onMa5Toggle: () => void
+  onMa20Toggle: () => void
+}) {
+  return (
+    <div className="stock-chart-controls" aria-label="行情研究控件">
+      <label className="stock-chart-control">
+        <span>时间范围</span>
+        <select aria-label="行情时间范围" value={query.range} onChange={(event) => onRangeChange(event.target.value as ChartRange)}>
+          {chartRanges.map((value) => <option key={value} value={value}>{chartRangeLabels[value]}</option>)}
+        </select>
+      </label>
+      <label className="stock-chart-control">
+        <span>复权方式</span>
+        <select aria-label="复权方式" value={query.adjust} onChange={(event) => onAdjustmentChange(event.target.value as ChartAdjustment)}>
+          {chartAdjustments.map((value) => <option key={value} value={value}>{chartAdjustmentLabels[value]}</option>)}
+        </select>
+      </label>
+      <div className="stock-chart-control stock-chart-control--toggle">
+        <span>对比基准</span>
+        <button type="button" className={query.benchmark === '000300.SH' ? 'stock-chart-toggle stock-chart-toggle--active' : 'stock-chart-toggle'} aria-pressed={query.benchmark === '000300.SH'} onClick={onBenchmarkToggle}>
+          沪深 300
+        </button>
+      </div>
+      <div className="stock-chart-control stock-chart-control--toggle">
+        <span>均线显示</span>
+        <div className="stock-chart-toggle-group">
+          <button type="button" className={showMa5 ? 'stock-chart-toggle stock-chart-toggle--active' : 'stock-chart-toggle'} aria-pressed={showMa5} onClick={onMa5Toggle}>MA5</button>
+          <button type="button" className={showMa20 ? 'stock-chart-toggle stock-chart-toggle--active' : 'stock-chart-toggle'} aria-pressed={showMa20} onClick={onMa20Toggle}>MA20</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type StockBarsErrorKind = 'invalid' | 'not-found' | 'unavailable'
+
+function stockBarsErrorKind(error: unknown): StockBarsErrorKind {
+  if (!isApiError(error)) return 'unavailable'
+  const code = isApiErrorResponse(error.payload) ? error.payload.code : undefined
+  if (error.status === 400 || code === 'VALIDATION_ERROR') return 'invalid'
+  if (error.status === 404 || code === 'NOT_FOUND') return 'not-found'
+  return 'unavailable'
+}
+
+function StockBarsErrorState({ error, onRetry, onBack, onReset }: { error: unknown; onRetry: () => void; onBack: () => void; onReset: () => void }) {
+  const kind = stockBarsErrorKind(error)
+  if (kind === 'invalid') {
+    return <ErrorState error={error} title="行情查询参数无效" hint="请恢复默认查询后重新请求真实行情数据。" actionLabel="恢复默认查询" onRetry={onReset} />
+  }
+  if (kind === 'not-found') {
+    return <ErrorState error={error} title="股票不存在" hint="行情接口未找到这个股票标识，请返回 Markets 重新选择。" actionLabel="返回 Markets" onRetry={onBack} />
+  }
+  return <ErrorState error={error} title="行情暂不可用" hint="服务或网络暂时不可用，页面不会使用替代数据；请稍后重试。" actionLabel="重试加载行情" onRetry={onRetry} />
+}
+
+function sourceLabel(mode: StockBars['source']['mode']) {
+  if (mode === 'real') return '真实 Provider'
+  if (mode === 'fallback') return '本地回退数据'
+  return 'Seed 数据'
+}
+
+function StockResearchSection({
+  symbol,
+  query,
+  onQueryChange,
+  onResetQuery,
+  onBack,
+}: {
+  symbol: string
+  query: StockChartQuery
+  onQueryChange: (next: Partial<Pick<StockChartQuery, 'range' | 'adjust' | 'benchmark'>>) => void
+  onResetQuery: () => void
+  onBack: () => void
+}) {
+  const { state, retry } = useStockBars(symbol, query)
+  const [showMa5, setShowMa5] = useState(true)
+  const [showMa20, setShowMa20] = useState(true)
+
+  return (
+    <section className="stock-research-section" aria-labelledby="stock-research-title">
+      <div className="market-section-heading">
+        <div>
+          <p className="market-section-kicker">RESEARCH CHART</p>
+          <h2 id="stock-research-title">行情</h2>
+        </div>
+        {state.status === 'success' ? <span className="market-section-meta">日频 · {state.data.source.seed_version}</span> : <span className="market-section-meta">研究型日线</span>}
+      </div>
+      <Card className="market-card stock-research-card" bordered>
+        <div className="stock-research-card__body">
+          {query.invalid.length > 0 ? (
+            <div className="stock-chart-query-notice" role="status">
+              URL 中的 {query.invalid.join('、')} 无效，已恢复为默认查询。
+              <Button variant="text" onClick={onResetQuery}>确认恢复</Button>
+            </div>
+          ) : null}
+          <StockChartControls
+            query={query}
+            showMa5={showMa5}
+            showMa20={showMa20}
+            onRangeChange={(range) => onQueryChange({ range })}
+            onAdjustmentChange={(adjust) => onQueryChange({ adjust })}
+            onBenchmarkToggle={() => onQueryChange({ benchmark: query.benchmark === 'none' ? '000300.SH' : 'none' })}
+            onMa5Toggle={() => setShowMa5((value) => !value)}
+            onMa20Toggle={() => setShowMa20((value) => !value)}
+          />
+          <div className="stock-research-query-summary">
+            <span>所选范围：{chartRangeLabels[query.range]}</span>
+            <span>复权：{chartAdjustmentLabels[query.adjust]}</span>
+            <span>基准：{query.benchmark === 'none' ? '未开启' : '沪深 300'}</span>
+          </div>
+          {state.status === 'loading' ? <LoadingState label={`正在请求 /api/v1/stocks/${encodeURIComponent(symbol)}/bars`} /> : null}
+          {state.status === 'error' ? <StockBarsErrorState error={state.error} onRetry={retry} onBack={onBack} onReset={onResetQuery} /> : null}
+          {state.status === 'success' ? (
+            <>
+              <StockResearchChart data={state.data} showMa5={showMa5} showMa20={showMa20} onRetry={retry} />
+              <div className="stock-research-source" aria-label="行情数据来源">
+                <span>数据来源：{sourceLabel(state.data.source.mode)}</span>
+                <span>{state.data.source.provider}</span>
+                <span>Seed {state.data.source.seed_version}</span>
+                <span>有效范围 {state.data.effective_range.from ?? '暂无'} 至 {state.data.effective_range.to ?? '暂无'}</span>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </Card>
+    </section>
+  )
+}
+
 function StockOverviewContent({ data }: { data: StockOverview }) {
   return (
     <div className="stock-overview-content">
@@ -324,8 +555,10 @@ function StockErrorState({ error, onRetry, onBack }: { error: unknown; onRetry: 
 export function StockOverviewPage() {
   const { symbol } = useParams<{ symbol: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [reloadKey, setReloadKey] = useState(0)
   const [state, setState] = useState<StockOverviewState>({ status: 'loading' })
+  const chartQuery = readChartQuery(searchParams)
 
   useEffect(() => {
     if (!symbol) return
@@ -348,6 +581,20 @@ export function StockOverviewPage() {
 
   const goBack = () => navigate(-1)
   const goToMarkets = () => navigate('/market')
+  const updateChartQuery = (next: Partial<Pick<StockChartQuery, 'range' | 'adjust' | 'benchmark'>>) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next.range !== undefined) nextParams.set('chart_range', next.range)
+    if (next.adjust !== undefined) nextParams.set('chart_adjust', next.adjust)
+    if (next.benchmark !== undefined) nextParams.set('chart_benchmark', next.benchmark)
+    setSearchParams(nextParams, { replace: true })
+  }
+  const resetChartQuery = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('chart_range', defaultChartRange)
+    nextParams.set('chart_adjust', defaultChartAdjustment)
+    nextParams.set('chart_benchmark', defaultChartBenchmark)
+    setSearchParams(nextParams, { replace: true })
+  }
 
   if (!symbol) {
     return (
@@ -369,7 +616,12 @@ export function StockOverviewPage() {
           <StockErrorState error={state.error} onRetry={() => setReloadKey((value) => value + 1)} onBack={goToMarkets} />
         </Card>
       ) : null}
-      {state.status === 'success' ? <StockOverviewContent data={state.data} /> : null}
+      {state.status === 'success' ? (
+        <>
+          <StockOverviewContent data={state.data} />
+          <StockResearchSection symbol={symbol} query={chartQuery} onQueryChange={updateChartQuery} onResetQuery={resetChartQuery} onBack={goToMarkets} />
+        </>
+      ) : null}
     </main>
   )
 }
