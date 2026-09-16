@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import { fetchStockBars } from '../api/stockBars'
+import { fetchStockFinancials } from '../api/stockFinancials'
 import { fetchStockOverview } from '../api/stockOverview'
 import { StockOverviewPage } from './StockOverviewPage'
 
@@ -16,9 +17,15 @@ vi.mock('../api/stockBars', () => ({
   chartRanges: ['20d', '60d', '120d', 'all'],
   fetchStockBars: vi.fn(),
 }))
+vi.mock('../api/stockFinancials', () => ({
+  financialPeriods: ['annual', 'quarterly'],
+  financialRanges: ['3y', '5y'],
+  fetchStockFinancials: vi.fn(),
+}))
 
 const fetchStockOverviewMock = vi.mocked(fetchStockOverview)
 const fetchStockBarsMock = vi.mocked(fetchStockBars)
+const fetchStockFinancialsMock = vi.mocked(fetchStockFinancials)
 
 const stockOverview = {
   symbol: '000001.SZ',
@@ -41,6 +48,39 @@ const stockOverview = {
       close: (10.18 + index * 0.01).toFixed(2),
     })),
   },
+}
+
+const stockFinancials = {
+  symbol: '000001.SZ',
+  name: '平安银行',
+  period: 'annual' as const,
+  requested_range: '5y' as const,
+  effective_range: { from: '2022-12-31', to: '2023-12-31' },
+  reporting_currency: 'CNY' as const,
+  amount_unit: 'CNY' as const,
+  latest_report_date: '2023-12-31',
+  summary: {
+    period_end: '2023-12-31', published_at: '2024-04-30', revenue: '1600.00', revenue_yoy_pct: '11.11',
+    net_profit: '272.00', net_profit_yoy_pct: '14.48', gross_margin_pct: '41.00', roe_pct: '23.78',
+    operating_cash_flow: '345.00', free_cash_flow: '240.00', debt_to_asset_pct: '45.00', current_ratio: '2.53',
+  },
+  reports: [
+    {
+      period_end: '2022-12-31', fiscal_year: 2022, fiscal_quarter: null, published_at: '2023-04-30',
+      income: { revenue: '1440.00', gross_profit: '583.20', operating_profit: '368.28', net_profit: '237.60' },
+      balance: { cash_and_equivalents: '257.25', accounts_receivable: '183.75', inventory: null, current_assets: '735.00', current_liabilities: '305.00', total_assets: '1940.00', total_liabilities: '892.40', total_equity: '1047.60' },
+      cash_flow: { operating_cash_flow: '310.00', capital_expenditure: '94.00', investing_cash_flow: '-68.20', financing_cash_flow: '-31.00', net_cash_change: '210.80' },
+      indicators: { revenue_yoy_pct: '12.50', net_profit_yoy_pct: '16.02', gross_margin_pct: '40.50', roe_pct: '22.68', free_cash_flow: '216.00', debt_to_asset_pct: '46.00', current_ratio: '2.41' },
+    },
+    {
+      period_end: '2023-12-31', fiscal_year: 2023, fiscal_quarter: null, published_at: '2024-04-30',
+      income: { revenue: '1600.00', gross_profit: '656.00', operating_profit: '421.60', net_profit: '272.00' },
+      balance: { cash_and_equivalents: '283.50', accounts_receivable: '202.50', inventory: '243.00', current_assets: '810.00', current_liabilities: '320.00', total_assets: '2080.00', total_liabilities: '936.00', total_equity: '1144.00' },
+      cash_flow: { operating_cash_flow: '345.00', capital_expenditure: '105.00', investing_cash_flow: '-75.90', financing_cash_flow: '-34.50', net_cash_change: '234.60' },
+      indicators: { revenue_yoy_pct: '11.11', net_profit_yoy_pct: '14.48', gross_margin_pct: '41.00', roe_pct: '23.78', free_cash_flow: '240.00', debt_to_asset_pct: '45.00', current_ratio: '2.53' },
+    },
+  ],
+  source: { mode: 'demo' as const, provider: 'mysql-demo-fixture' as const, seed_version: 'fnd-003-demo-v7', as_of: '2024-06-28' },
 }
 
 const stockBars = {
@@ -103,6 +143,11 @@ describe('StockOverviewPage', () => {
       const response = request.benchmark === '000300.SH' ? stockBarsWithBenchmark : stockBars
       return { ...response, adjust: request.adjust }
     })
+    fetchStockFinancialsMock.mockImplementation(async (_symbol, request) => ({
+      ...stockFinancials,
+      period: request.period,
+      requested_range: request.range,
+    }))
   })
 
   it('shows a loading state while requesting the raw route symbol', () => {
@@ -134,6 +179,59 @@ describe('StockOverviewPage', () => {
     expect(screen.getAllByText('2024-06-03').length).toBeGreaterThan(0)
     expect(screen.getAllByText('2024-06-22').length).toBeGreaterThan(0)
     expect(screen.queryByText(/Coming Soon/i)).not.toBeInTheDocument()
+  })
+
+  it('renders financial summaries, reported trends, statements, null semantics, and URL-restored controls', async () => {
+    const user = userEvent.setup()
+    renderStockPage('/stocks/000001.SZ?financial_period=quarterly&financial_range=3y')
+
+    expect(await screen.findByRole('heading', { name: '财务' })).toBeInTheDocument()
+    expect(screen.getByLabelText('财务报告口径')).toHaveValue('quarterly')
+    expect(screen.getByLabelText('财务观察范围')).toHaveValue('3y')
+    expect(screen.getByText('最新财务摘要')).toBeInTheDocument()
+    expect(screen.getByText('财务趋势')).toBeInTheDocument()
+    expect(screen.getByText('简化利润表')).toBeInTheDocument()
+    expect(screen.getByText('简化资产负债表')).toBeInTheDocument()
+    expect(screen.getByText('简化现金流量表')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '营业收入趋势，单位 CNY' })).toBeInTheDocument()
+    expect(screen.getAllByText('暂无披露').length).toBeGreaterThan(0)
+    expect(fetchStockFinancialsMock).toHaveBeenCalledWith(
+      '000001.SZ',
+      { period: 'quarterly', range: '3y' },
+      expect.any(AbortSignal),
+    )
+
+    await user.selectOptions(screen.getByLabelText('财务报告口径'), 'annual')
+    await screen.findByText('口径：年度')
+    expect(fetchStockFinancialsMock).toHaveBeenLastCalledWith(
+      '000001.SZ',
+      { period: 'annual', range: '3y' },
+      expect.any(AbortSignal),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent('financial_period=annual')
+  })
+
+  it('recovers invalid financial URL values without requesting an invalid combination', async () => {
+    renderStockPage('/stocks/000001.SZ?financial_period=monthly&financial_range=10y')
+
+    expect(await screen.findByRole('heading', { name: '财务' })).toBeInTheDocument()
+    expect(screen.getByLabelText('财务报告口径')).toHaveValue('annual')
+    expect(screen.getByLabelText('财务观察范围')).toHaveValue('5y')
+    expect(screen.getByText('URL 中的 financial_period、financial_range 无效，已恢复为默认查询。')).toBeInTheDocument()
+    expect(fetchStockFinancialsMock).toHaveBeenLastCalledWith(
+      '000001.SZ',
+      { period: 'annual', range: '5y' },
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('shows a recoverable empty financial result without synthesizing a summary', async () => {
+    fetchStockFinancialsMock.mockResolvedValueOnce({ ...stockFinancials, reports: [], summary: null, effective_range: { from: null, to: null }, latest_report_date: null })
+
+    renderStockPage()
+
+    expect(await screen.findByText('所选口径和范围暂无财务数据，请调整查询范围后重试。')).toBeInTheDocument()
+    expect(screen.queryByText('最新财务摘要')).not.toBeInTheDocument()
   })
 
   it('renders the research chart and requests URL-restored range, adjustment, and benchmark state', async () => {

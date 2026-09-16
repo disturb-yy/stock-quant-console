@@ -13,8 +13,10 @@ import {
   type ChartRange,
   type StockBars,
 } from '../api/stockBars'
+import { financialPeriods, financialRanges, type FinancialPeriod, type FinancialRange } from '../api/stockFinancials'
 import { fetchStockOverview, type StockMetric, type StockOverview, type StockSparklinePoint } from '../api/stockOverview'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
+import { StockFinancialsSection, type FinancialQuery } from '../components/StockFinancialsSection'
 import { StockResearchChart } from '../components/StockResearchChart'
 
 type StockOverviewState =
@@ -53,6 +55,22 @@ function readChartQuery(searchParams: URLSearchParams): StockChartQuery {
   if (rawBenchmark !== null && benchmark === defaultChartBenchmark && rawBenchmark !== defaultChartBenchmark) invalid.push('chart_benchmark')
 
   return { range, adjust, benchmark, invalid }
+}
+
+const defaultFinancialPeriod: FinancialPeriod = 'annual'
+const defaultFinancialRange: FinancialRange = '5y'
+
+function readFinancialQuery(searchParams: URLSearchParams): FinancialQuery {
+  const invalid: string[] = []
+  const rawPeriod = searchParams.get('financial_period')
+  const period = financialPeriods.includes(rawPeriod as FinancialPeriod) ? rawPeriod as FinancialPeriod : defaultFinancialPeriod
+  if (rawPeriod !== null && period === defaultFinancialPeriod && rawPeriod !== defaultFinancialPeriod) invalid.push('financial_period')
+
+  const rawRange = searchParams.get('financial_range')
+  const range = financialRanges.includes(rawRange as FinancialRange) ? rawRange as FinancialRange : defaultFinancialRange
+  if (rawRange !== null && range === defaultFinancialRange && rawRange !== defaultFinancialRange) invalid.push('financial_range')
+
+  return { period, range, invalid }
 }
 
 function useStockBars(symbol: string, query: StockChartQuery) {
@@ -559,6 +577,7 @@ export function StockOverviewPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [state, setState] = useState<StockOverviewState>({ status: 'loading' })
   const chartQuery = readChartQuery(searchParams)
+  const financialQuery = readFinancialQuery(searchParams)
 
   useEffect(() => {
     if (!symbol) return
@@ -595,6 +614,18 @@ export function StockOverviewPage() {
     nextParams.set('chart_benchmark', defaultChartBenchmark)
     setSearchParams(nextParams, { replace: true })
   }
+  const updateFinancialQuery = (next: Partial<Pick<FinancialQuery, 'period' | 'range'>>) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next.period !== undefined) nextParams.set('financial_period', next.period)
+    if (next.range !== undefined) nextParams.set('financial_range', next.range)
+    setSearchParams(nextParams, { replace: true })
+  }
+  const resetFinancialQuery = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('financial_period', defaultFinancialPeriod)
+    nextParams.set('financial_range', defaultFinancialRange)
+    setSearchParams(nextParams, { replace: true })
+  }
 
   if (!symbol) {
     return (
@@ -619,6 +650,7 @@ export function StockOverviewPage() {
       {state.status === 'success' ? (
         <>
           <StockOverviewContent data={state.data} />
+          <StockFinancialsSection symbol={symbol} query={financialQuery} onQueryChange={updateFinancialQuery} onResetQuery={resetFinancialQuery} onBack={goToMarkets} />
           <StockResearchSection symbol={symbol} query={chartQuery} onQueryChange={updateChartQuery} onResetQuery={resetChartQuery} onBack={goToMarkets} />
         </>
       ) : null}

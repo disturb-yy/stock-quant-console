@@ -20,7 +20,7 @@ export const isDemoStatus: PayloadValidator<DemoStatus> = (value): value is Demo
   if (typeof value.seed_version !== 'string' || (value.as_of !== null && typeof value.as_of !== 'string')) return false
   const counts = value.counts
   if (!isRecord(counts)) return false
-  if (!['instruments', 'daily_bars', 'daily_basics', 'financial_metrics', 'index_snapshots'].every((key) => isNonNegativeNumber(counts[key]))) {
+  if (!['instruments', 'daily_bars', 'daily_basics', 'financial_metrics', 'financial_reports', 'index_snapshots'].every((key) => isNonNegativeNumber(counts[key]))) {
     return false
   }
   if (!Array.isArray(value.sample_stocks)) return false

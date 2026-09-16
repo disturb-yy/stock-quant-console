@@ -7,7 +7,7 @@ const demoStatus = {
   provider: 'mysql-demo-fixture' as const,
   seed_version: 'fnd-003-demo-v1',
   as_of: '2024-06-28',
-  counts: { instruments: 3, daily_bars: 6, daily_basics: 6, financial_metrics: 6, index_snapshots: 4 },
+  counts: { instruments: 3, daily_bars: 6, daily_basics: 6, financial_metrics: 6, financial_reports: 27, index_snapshots: 4 },
   sample_stocks: [{ code: '000001.SZ', name: '平安银行', exchange: 'SZSE' as const, status: 'active' as const }],
 }
 

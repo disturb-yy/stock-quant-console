@@ -11,7 +11,7 @@ const demoStatus = {
   provider: 'mysql-demo-fixture' as const,
   seed_version: 'fnd-003-demo-v1',
   as_of: '2024-06-28',
-  counts: { instruments: 3, daily_bars: 6, daily_basics: 6, financial_metrics: 6, index_snapshots: 4 },
+  counts: { instruments: 3, daily_bars: 6, daily_basics: 6, financial_metrics: 6, financial_reports: 27, index_snapshots: 4 },
   sample_stocks: [{ code: '000001.SZ', name: '平安银行', exchange: 'SZSE' as const, status: 'active' as const }],
 }
 
@@ -152,7 +152,7 @@ describe('DashboardPage demo status states', () => {
   it('keeps an empty backend response explicit and retries through the same client', async () => {
     const user = userEvent.setup()
     fetchDemoStatusMock
-      .mockResolvedValueOnce({ ...demoStatus, counts: { instruments: 0, daily_bars: 0, daily_basics: 0, financial_metrics: 0, index_snapshots: 0 }, sample_stocks: [] })
+      .mockResolvedValueOnce({ ...demoStatus, counts: { instruments: 0, daily_bars: 0, daily_basics: 0, financial_metrics: 0, financial_reports: 0, index_snapshots: 0 }, sample_stocks: [] })
       .mockResolvedValueOnce(demoStatus)
 
     render(<DashboardPage />)
