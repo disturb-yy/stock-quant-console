@@ -17,10 +17,10 @@ function isNonNegativeNumber(value: unknown): value is number {
 export const isDemoStatus: PayloadValidator<DemoStatus> = (value): value is DemoStatus => {
   if (!isRecord(value) || !modes.includes(value.mode as DemoStatus['mode'])) return false
   if (!providers.includes(value.provider as DemoStatus['provider'])) return false
-  if (typeof value.seed_version !== 'string' || typeof value.as_of !== 'string') return false
+  if (typeof value.seed_version !== 'string' || (value.as_of !== null && typeof value.as_of !== 'string')) return false
   const counts = value.counts
   if (!isRecord(counts)) return false
-  if (!['instruments', 'daily_bars', 'financial_metrics'].every((key) => isNonNegativeNumber(counts[key]))) {
+  if (!['instruments', 'daily_bars', 'daily_basics', 'financial_metrics', 'index_snapshots'].every((key) => isNonNegativeNumber(counts[key]))) {
     return false
   }
   if (!Array.isArray(value.sample_stocks)) return false

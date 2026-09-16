@@ -20,17 +20,18 @@ function literal(value) {
 
 function schemaType(schema) {
   if (!schema || typeof schema !== 'object') return 'unknown'
-  if (schema.$ref) return typeName(schema.$ref)
-  if (schema.oneOf) return schema.oneOf.map(schemaType).join(' | ')
-  if (schema.anyOf) return schema.anyOf.map(schemaType).join(' | ')
-  if (schema.allOf) return schema.allOf.map(schemaType).join(' & ')
-  if (schema.enum) return schema.enum.map(literal).join(' | ')
-  if (schema.type === 'array') return `ReadonlyArray<${schemaType(schema.items)}>`
-  if (schema.type === 'object' || schema.properties) return objectType(schema)
-  if (schema.type === 'string') return 'string'
-  if (schema.type === 'integer' || schema.type === 'number') return 'number'
-  if (schema.type === 'boolean') return 'boolean'
-  return 'unknown'
+  let type = 'unknown'
+  if (schema.$ref) type = typeName(schema.$ref)
+  else if (schema.oneOf) type = schema.oneOf.map(schemaType).join(' | ')
+  else if (schema.anyOf) type = schema.anyOf.map(schemaType).join(' | ')
+  else if (schema.allOf) type = schema.allOf.map(schemaType).join(' & ')
+  else if (schema.enum) type = schema.enum.map(literal).join(' | ')
+  else if (schema.type === 'array') type = `ReadonlyArray<${schemaType(schema.items)}>`
+  else if (schema.type === 'object' || schema.properties) type = objectType(schema)
+  else if (schema.type === 'string') type = 'string'
+  else if (schema.type === 'integer' || schema.type === 'number') type = 'number'
+  else if (schema.type === 'boolean') type = 'boolean'
+  return schema.nullable ? `${type} | null` : type
 }
 
 function objectType(schema) {

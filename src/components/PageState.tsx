@@ -25,15 +25,16 @@ export function ErrorState({
   error,
   description,
   hint,
+  title = '服务暂不可用',
   actionLabel = '重新检查',
   onRetry,
-}: { error?: unknown; description?: string; hint?: string; actionLabel?: string; onRetry?: () => void }) {
+}: { error?: unknown; description?: string; hint?: string; title?: string; actionLabel?: string; onRetry?: () => void }) {
   const display = error === undefined
     ? { message: description ?? '请求失败', diagnostic: '' }
     : describeApiError(error, formatBackendApiError)
   return (
     <div className="page-state page-state--error" role="alert">
-      <Alert theme="error" message={<span><strong>服务暂不可用</strong> · {display.message}</span>} />
+      <Alert theme="error" message={<span><strong>{title}</strong> · {display.message}</span>} />
       {display.diagnostic ? <code className="page-state__diagnostic">{display.diagnostic}</code> : null}
       {hint ? <p className="page-state__hint">{hint}</p> : null}
       {onRetry ? (

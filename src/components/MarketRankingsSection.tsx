@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, Pagination } from 'tdesign-react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { isApiAbortError } from '../api/client'
 import {
   fetchMarketRankings,
@@ -15,7 +15,13 @@ import { EmptyState, ErrorState, LoadingState } from './PageState'
 const defaultMetric: RankingMetric = 'gain'
 const defaultPage = 1
 const defaultPageSize = 5
-const pageSizeOptions = [5, 10, 20, 50]
+const pageSizeOptions = [
+  { label: '5 条/页', value: 5 },
+  { label: '10 条/页', value: 10 },
+  { label: '20 条/页', value: 20 },
+  { label: '50 条/页', value: 50 },
+]
+const pageSizeValues = pageSizeOptions.map(({ value }) => value)
 
 const metricLabels: Record<RankingMetric, string> = {
   gain: '涨幅',
@@ -51,7 +57,7 @@ function readPositiveInteger(value: string | null, fallback: number, key: string
 
 function readPageSize(value: string | null, invalid: string[]) {
   const pageSize = readPositiveInteger(value, defaultPageSize, 'ranking_page_size', invalid)
-  if (pageSizeOptions.includes(pageSize)) return pageSize
+  if (pageSizeValues.includes(pageSize)) return pageSize
   invalid.push('ranking_page_size')
   return defaultPageSize
 }
@@ -168,11 +174,12 @@ function RankingsTable({ data }: { data: MarketRankings }) {
 }
 
 function RankingRow({ ranking, data, source }: { ranking: MarketRanking; data: MarketRankings; source: string }) {
+  const stockPath = `/stocks/${encodeURIComponent(ranking.code)}`
   return (
     <tr>
       <td className="market-ranking-table__rank">{ranking.rank}</td>
-      <th scope="row"><code>{ranking.code}</code></th>
-      <td className="market-ranking-table__name">{ranking.name}</td>
+      <th scope="row"><Link className="market-ranking-table__link" to={stockPath}><code>{ranking.code}</code></Link></th>
+      <td className="market-ranking-table__name"><Link className="market-ranking-table__link" to={stockPath}>{ranking.name}</Link></td>
       <td><RankingValue metric={data.metric} value={ranking.value} /></td>
       <td className="market-ranking-table__number">{formatNumber(ranking.close)}</td>
       <td><time dateTime={data.as_of}>{data.as_of}</time></td>
@@ -189,13 +196,14 @@ function RankingsPagination({ data, onQueryChange }: {
     <div className="market-ranking-pagination" aria-label="排行榜分页">
       <span>本页 {data.data.length} 条，共 {data.pagination.total} 条</span>
       <Pagination
+        className="market-ranking-pagination__control"
         current={data.pagination.page}
         pageSize={data.pagination.page_size}
         total={data.pagination.total}
         pageSizeOptions={pageSizeOptions}
-        showJumper
-        showFirstAndLastPageBtn
-        selectProps={{ label: '每页' }}
+        selectProps={{ autoWidth: false }}
+        totalContent={false}
+        showJumper={false}
         onCurrentChange={(page) => onQueryChange({ page, pageSize: data.pagination.page_size })}
         onPageSizeChange={(pageSize) => onQueryChange({ page: defaultPage, pageSize })}
       />

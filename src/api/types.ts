@@ -23,4 +23,10 @@ export type {
   SectorLeader,
   SignalParameters,
   SignalResult,
+  StockMetric,
+  StockMetrics,
+  StockOverview,
+  StockQuote,
+  StockSparkline,
+  StockSparklinePoint,
 } from './generated'

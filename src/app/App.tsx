@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { DashboardPage } from '../pages/DashboardPage'
 import { MarketOverviewPage } from '../pages/MarketOverviewPage'
+import { StockOverviewPage } from '../pages/StockOverviewPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
 
 export function App() {
@@ -11,6 +12,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/market" element={<MarketOverviewPage />} />
+          <Route path="/stocks/:symbol" element={<StockOverviewPage />} />
           <Route path="/screening" element={<WorkspacePage workspace="选股" />} />
           <Route path="/watchlist" element={<WorkspacePage workspace="自选" />} />
           <Route path="/research" element={<WorkspacePage workspace="研究" />} />

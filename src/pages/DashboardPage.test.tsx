@@ -11,7 +11,7 @@ const demoStatus = {
   provider: 'mysql-demo-fixture' as const,
   seed_version: 'fnd-003-demo-v1',
   as_of: '2024-06-28',
-  counts: { instruments: 3, daily_bars: 6, financial_metrics: 6, index_snapshots: 4 },
+  counts: { instruments: 3, daily_bars: 6, daily_basics: 6, financial_metrics: 6, index_snapshots: 4 },
   sample_stocks: [{ code: '000001.SZ', name: '平安银行', exchange: 'SZSE' as const, status: 'active' as const }],
 }
 
@@ -116,6 +116,7 @@ describe('DashboardPage demo status states', () => {
     expect(screen.getByText('平安银行')).toBeInTheDocument()
     expect(screen.getByText('股票标的')).toBeInTheDocument()
     expect(screen.getByText('日 K 线')).toBeInTheDocument()
+    expect(screen.getByText('每日基本面')).toBeInTheDocument()
     expect(screen.getByText('财务指标')).toBeInTheDocument()
     expect(screen.getByText(/不是实时\/真实行情/)).toBeInTheDocument()
   })
@@ -151,7 +152,7 @@ describe('DashboardPage demo status states', () => {
   it('keeps an empty backend response explicit and retries through the same client', async () => {
     const user = userEvent.setup()
     fetchDemoStatusMock
-      .mockResolvedValueOnce({ ...demoStatus, counts: { instruments: 0, daily_bars: 0, financial_metrics: 0, index_snapshots: 0 }, sample_stocks: [] })
+      .mockResolvedValueOnce({ ...demoStatus, counts: { instruments: 0, daily_bars: 0, daily_basics: 0, financial_metrics: 0, index_snapshots: 0 }, sample_stocks: [] })
       .mockResolvedValueOnce(demoStatus)
 
     render(<DashboardPage />)

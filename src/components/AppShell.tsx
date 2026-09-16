@@ -14,7 +14,9 @@ const navItems = [
 ]
 
 function getActivePath(pathname: string) {
-  return pathname === '/' ? '/' : navItems.find((item) => pathname.startsWith(item.path))?.path ?? '/'
+  if (pathname === '/') return '/'
+  if (pathname.startsWith('/stocks/')) return '/market'
+  return navItems.find((item) => pathname.startsWith(item.path))?.path ?? '/'
 }
 
 export function AppShell({ children }: { children: ReactNode }) {

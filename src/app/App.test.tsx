@@ -26,6 +26,10 @@ vi.mock('../api/marketRankings', () => ({
   rankingMetrics: ['gain', 'loss', 'turnover_amount', 'turnover_rate'],
 }))
 
+vi.mock('../api/stockOverview', () => ({
+  fetchStockOverview: vi.fn(() => new Promise(() => undefined)),
+}))
+
 function renderShell(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -56,6 +60,12 @@ describe('AppShell', () => {
     expect(screen.getByText('研究', { selector: '.t-menu__content' }).closest('li')).toHaveClass('t-is-active')
   })
 
+  it('keeps Markets active while viewing a stock detail', () => {
+    renderShell('/stocks/000001.SZ')
+
+    expect(screen.getByText('市场', { selector: '.t-menu__content' }).closest('li')).toHaveClass('t-is-active')
+  })
+
   it('keeps a workspace route addressable after a direct load', () => {
     window.history.pushState({}, '', '/backtest')
 
@@ -71,5 +81,14 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('heading', { name: '市场概览' })).toBeInTheDocument()
     expect(screen.getByText('正在请求 /api/v1/markets/overview')).toBeInTheDocument()
+  })
+
+  it('keeps the stock overview route addressable after a direct load', () => {
+    window.history.pushState({}, '', '/stocks/000001.SZ')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: '股票详情' })).toBeInTheDocument()
+    expect(screen.getByText('正在请求 /api/v1/stocks/000001.SZ')).toBeInTheDocument()
   })
 })

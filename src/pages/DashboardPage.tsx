@@ -120,6 +120,7 @@ const modePresentation = {
 const countItems: ReadonlyArray<{ key: keyof DemoStatus['counts']; label: string }> = [
   { key: 'instruments', label: '股票标的' },
   { key: 'daily_bars', label: '日 K 线' },
+  { key: 'daily_basics', label: '每日基本面' },
   { key: 'financial_metrics', label: '财务指标' },
 ]
 
@@ -148,7 +149,7 @@ function DemoStatusMeta({ data }: { data: DemoStatus }) {
       <dl className="demo-status__meta">
         <div><dt>Provider</dt><dd>{data.provider}</dd></div>
         <div><dt>seed_version</dt><dd>{data.seed_version}</dd></div>
-        <div><dt>as_of</dt><dd><time dateTime={data.as_of}>{data.as_of}</time></dd></div>
+        <div><dt>as_of</dt><dd>{data.as_of ? <time dateTime={data.as_of}>{data.as_of}</time> : '暂无数据'}</dd></div>
       </dl>
     </>
   )
