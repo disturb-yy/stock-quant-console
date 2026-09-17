@@ -3,6 +3,7 @@ import { AppShell } from '../components/AppShell'
 import { DashboardPage } from '../pages/DashboardPage'
 import { MarketOverviewPage } from '../pages/MarketOverviewPage'
 import { StockOverviewPage } from '../pages/StockOverviewPage'
+import { ScreeningPage } from '../pages/ScreeningPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
 
 export function App() {
@@ -13,7 +14,7 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/market" element={<MarketOverviewPage />} />
           <Route path="/stocks/:symbol" element={<StockOverviewPage />} />
-          <Route path="/screening" element={<WorkspacePage workspace="选股" />} />
+          <Route path="/screening" element={<ScreeningPage />} />
           <Route path="/watchlist" element={<WorkspacePage workspace="自选" />} />
           <Route path="/research" element={<WorkspacePage workspace="研究" />} />
           <Route path="/strategy" element={<WorkspacePage workspace="策略" />} />
