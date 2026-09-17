@@ -385,6 +385,28 @@ describe('StockOverviewPage', () => {
     )
   })
 
+  it('keeps research chart axes and edge labels readable in a 20-day view', async () => {
+    renderStockPage()
+
+    const priceChart = await screen.findByRole('img', { name: '日 K 线与均线' })
+    const volumeChart = screen.getByRole('img', { name: '成交量' })
+
+    expect(priceChart).toHaveStyle({ width: '100%' })
+    expect(volumeChart).toHaveStyle({ width: '100%' })
+
+    for (const chart of [priceChart, volumeChart]) {
+      const axisLabels = chart.querySelectorAll('.stock-research-chart__grid text')
+      expect(axisLabels.length).toBe(3)
+      axisLabels.forEach((label) => expect(label).toHaveAttribute('text-anchor', 'end'))
+
+      const dateLabels = chart.querySelectorAll('.stock-research-chart__dates text')
+      expect(dateLabels).toHaveLength(3)
+      expect(dateLabels[0]).toHaveAttribute('text-anchor', 'start')
+      expect(dateLabels[1]).toHaveAttribute('text-anchor', 'middle')
+      expect(dateLabels[2]).toHaveAttribute('text-anchor', 'end')
+    }
+  })
+
   it('keeps stock charts visible when the requested benchmark has no common dates', async () => {
     fetchStockBarsMock.mockResolvedValue({ ...stockBars, benchmark: { ...stockBarsWithBenchmark.benchmark, points: [] } })
 

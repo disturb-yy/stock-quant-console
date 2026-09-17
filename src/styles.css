@@ -2443,7 +2443,7 @@ a {
 .stock-research-chart__svg {
   display: block;
   width: max(100%, 760px);
-  min-width: 760px;
+  min-width: 0;
   height: auto;
   min-height: 260px;
   margin-top: 8px;

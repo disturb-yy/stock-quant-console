@@ -10,6 +10,7 @@ const chartTop = 24
 const chartBottom = 44
 const chartHeight = 320
 const plotHeight = chartHeight - chartTop - chartBottom
+const scrollableChartThreshold = 60
 
 type NumericBar = {
   source: StockBar
@@ -54,6 +55,10 @@ function chartWidthForCount(count: number) {
   return Math.max(minimumChartWidth, chartLeft + chartRight + Math.max(count, 1) * chartPointSpacing)
 }
 
+function chartWidthStyle(count: number, width: number) {
+  return count > scrollableChartThreshold ? `max(100%, ${width}px)` : '100%'
+}
+
 function chartX(index: number, count: number, width: number) {
   const plotWidth = width - chartLeft - chartRight
   return chartLeft + (count <= 1 ? plotWidth / 2 : (plotWidth * index) / (count - 1))
@@ -92,7 +97,10 @@ function DateLabels({ dates, y, width }: { dates: ReadonlyArray<string>; y: numb
   const indexes = dates.length <= 2 ? dates.map((_, index) => index) : [0, Math.floor((dates.length - 1) / 2), dates.length - 1]
   return (
     <g className="stock-research-chart__dates" aria-hidden="true">
-      {indexes.map((index) => <text key={`${dates[index]}-${index}`} x={chartX(index, dates.length, width)} y={y}>{dates[index]}</text>)}
+      {indexes.map((index) => {
+        const textAnchor = index === 0 ? 'start' : index === dates.length - 1 ? 'end' : 'middle'
+        return <text key={`${dates[index]}-${index}`} x={chartX(index, dates.length, width)} y={y} textAnchor={textAnchor}>{dates[index]}</text>
+      })}
     </g>
   )
 }
@@ -103,7 +111,7 @@ function GridLines({ domain, formatTick, width }: { domain: ReturnType<typeof ch
     <g className="stock-research-chart__grid" aria-hidden="true">
       {ticks.map((value) => {
         const y = chartY(value, domain)
-        return <g key={value}><line x1={chartLeft} x2={width - chartRight} y1={y} y2={y} /><text x={chartLeft - 10} y={y + 4}>{formatTick(value)}</text></g>
+        return <g key={value}><line x1={chartLeft} x2={width - chartRight} y1={y} y2={y} /><text x={chartLeft - 10} y={y + 4} textAnchor="end">{formatTick(value)}</text></g>
       })}
     </g>
   )
@@ -129,7 +137,7 @@ function StockPriceChart({ bars, showMa5, showMa20 }: { bars: ReadonlyArray<Nume
         <span>均线由 API 返回</span>
       </div>
       <div className="stock-research-chart__scroll">
-        <svg className="stock-research-chart__svg" style={{ width: `max(100%, ${width}px)` }} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label="日 K 线与均线">
+        <svg className="stock-research-chart__svg" style={{ width: chartWidthStyle(bars.length, width) }} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label="日 K 线与均线">
           <title>日 K 线与均线</title>
           <GridLines domain={domain} formatTick={(value) => formatValue(value)} width={width} />
           <polyline className="stock-research-chart__close" points={closePath} fill="none" vectorEffect="non-scaling-stroke" />
@@ -187,7 +195,7 @@ function StockVolumeChart({ bars }: { bars: ReadonlyArray<NumericBar> }) {
         <span>非复权字段</span>
       </div>
       <div className="stock-research-chart__scroll">
-        <svg className="stock-research-chart__svg" style={{ width: `max(100%, ${width}px)` }} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label="成交量">
+        <svg className="stock-research-chart__svg" style={{ width: chartWidthStyle(bars.length, width) }} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label="成交量">
           <title>成交量</title>
           <GridLines domain={volumeDomain} formatTick={(value) => formatVolume(value)} width={width} />
           {bars.map((bar, index) => {
@@ -242,7 +250,7 @@ function BenchmarkChart({ points }: { points: ReadonlyArray<StockBenchmarkPoint>
         <span>共同日期 {points.length}</span>
       </div>
       <div className="stock-research-chart__scroll">
-        <svg className="stock-research-chart__svg" style={{ width: `max(100%, ${width}px)` }} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label="沪深 300 相对表现">
+        <svg className="stock-research-chart__svg" style={{ width: chartWidthStyle(points.length, width) }} viewBox={`0 0 ${width} ${chartHeight}`} role="img" aria-label="沪深 300 相对表现">
           <title>沪深 300 相对表现</title>
           <GridLines domain={domain} formatTick={(value) => `${formatValue(value)}%`} width={width} />
           <line className="stock-research-chart__zero" x1={chartLeft} x2={width - chartRight} y1={chartY(0, domain)} y2={chartY(0, domain)} />
