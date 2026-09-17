@@ -1862,6 +1862,311 @@ a {
   border-bottom: 0;
 }
 
+.stock-valuation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stock-valuation-card .t-card__body {
+  padding: 0;
+}
+
+.stock-valuation-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+.valuation-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: end;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.valuation-controls label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.valuation-controls label > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.valuation-controls select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--body);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.valuation-controls select:hover,
+.valuation-controls select:focus-visible {
+  border-color: var(--brand);
+}
+
+.valuation-query-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  color: var(--body);
+  background: var(--surface-raised);
+  border-left: 2px solid var(--brand);
+  font-size: 13px;
+}
+
+.valuation-query-notice button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--brand);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.valuation-query-notice button:hover {
+  border-color: var(--brand);
+}
+
+.valuation-query-summary,
+.valuation-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  color: var(--muted);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-query-summary span + span,
+.valuation-source span + span {
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+
+.valuation-disclaimer {
+  margin: 0;
+  padding: 12px 16px;
+  color: var(--muted);
+  background: var(--surface-raised);
+  border-left: 2px solid var(--line);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.valuation-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.valuation-metric-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+}
+
+.valuation-metric-card__heading,
+.valuation-subsection-heading,
+.valuation-industry__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.valuation-metric-card__heading h3,
+.valuation-subsection-heading h3,
+.valuation-industry__heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.valuation-metric-card__heading code {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.valuation-metric-card__position {
+  flex: 0 0 auto;
+  color: var(--body);
+  font-size: 12px;
+  text-align: right;
+}
+
+.valuation-metric-card__value {
+  margin: 0;
+  color: var(--text);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.valuation-metric-card__value--empty {
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 20px;
+}
+
+.valuation-metric-card__meta {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.valuation-metric-card__meta div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.valuation-metric-card__meta dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.valuation-metric-card__meta dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--body);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.valuation-metric-card__method {
+  margin: auto 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.valuation-industry-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.valuation-subsection-heading > span,
+.valuation-industry__heading > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.valuation-industry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.valuation-industry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.valuation-table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--line);
+}
+
+.valuation-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  color: var(--body);
+  font-size: 13px;
+}
+
+.valuation-table th,
+.valuation-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  vertical-align: top;
+}
+
+.valuation-table thead th {
+  color: var(--muted);
+  background: var(--surface-raised);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.valuation-table th:first-child,
+.valuation-table td:first-child {
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.valuation-table tbody td {
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-table tr:last-child th,
+.valuation-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.valuation-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  color: var(--muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  line-height: 1.6;
+}
+
+.valuation-empty strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.valuation-empty--section .t-button {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding-left: 0;
+}
+
 .stock-trend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2439,6 +2744,10 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .valuation-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .stock-research-chart-grid {
     grid-template-columns: 1fr;
   }
@@ -2635,6 +2944,11 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .valuation-controls,
+  .valuation-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
   .financial-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -2648,6 +2962,30 @@ a {
   .financial-query-notice {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .valuation-query-notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .valuation-subsection-heading,
+  .valuation-industry__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .valuation-query-summary,
+  .valuation-source {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .valuation-query-summary span + span,
+  .valuation-source span + span {
+    padding-left: 0;
+    border-left: 0;
   }
 
   .stock-chart-query-notice {

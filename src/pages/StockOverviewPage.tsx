@@ -15,9 +15,11 @@ import {
 } from '../api/stockBars'
 import { financialPeriods, financialRanges, type FinancialPeriod, type FinancialRange } from '../api/stockFinancials'
 import { fetchStockOverview, type StockMetric, type StockOverview, type StockSparklinePoint } from '../api/stockOverview'
+import { valuationRanges, type ValuationRange } from '../api/stockValuation'
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState'
 import { StockFinancialsSection, type FinancialQuery } from '../components/StockFinancialsSection'
 import { StockResearchChart } from '../components/StockResearchChart'
+import { StockValuationSection, type ValuationQuery } from '../components/StockValuationSection'
 
 type StockOverviewState =
   | { status: 'loading' }
@@ -71,6 +73,16 @@ function readFinancialQuery(searchParams: URLSearchParams): FinancialQuery {
   if (rawRange !== null && range === defaultFinancialRange && rawRange !== defaultFinancialRange) invalid.push('financial_range')
 
   return { period, range, invalid }
+}
+
+const defaultValuationRange: ValuationRange = '5y'
+
+function readValuationQuery(searchParams: URLSearchParams): ValuationQuery {
+  const invalid: string[] = []
+  const rawRange = searchParams.get('valuation_range')
+  const range = valuationRanges.includes(rawRange as ValuationRange) ? rawRange as ValuationRange : defaultValuationRange
+  if (rawRange !== null && range === defaultValuationRange && rawRange !== defaultValuationRange) invalid.push('valuation_range')
+  return { range, invalid }
 }
 
 function useStockBars(symbol: string, query: StockChartQuery) {
@@ -578,6 +590,7 @@ export function StockOverviewPage() {
   const [state, setState] = useState<StockOverviewState>({ status: 'loading' })
   const chartQuery = readChartQuery(searchParams)
   const financialQuery = readFinancialQuery(searchParams)
+  const valuationQuery = readValuationQuery(searchParams)
 
   useEffect(() => {
     if (!symbol) return
@@ -626,6 +639,16 @@ export function StockOverviewPage() {
     nextParams.set('financial_range', defaultFinancialRange)
     setSearchParams(nextParams, { replace: true })
   }
+  const updateValuationQuery = (next: Partial<Pick<ValuationQuery, 'range'>>) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next.range !== undefined) nextParams.set('valuation_range', next.range)
+    setSearchParams(nextParams, { replace: true })
+  }
+  const resetValuationQuery = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('valuation_range', defaultValuationRange)
+    setSearchParams(nextParams, { replace: true })
+  }
 
   if (!symbol) {
     return (
@@ -651,6 +674,7 @@ export function StockOverviewPage() {
         <>
           <StockOverviewContent data={state.data} />
           <StockFinancialsSection symbol={symbol} query={financialQuery} onQueryChange={updateFinancialQuery} onResetQuery={resetFinancialQuery} onBack={goToMarkets} />
+          <StockValuationSection symbol={symbol} query={valuationQuery} onQueryChange={updateValuationQuery} onResetQuery={resetValuationQuery} onBack={goToMarkets} />
           <StockResearchSection symbol={symbol} query={chartQuery} onQueryChange={updateChartQuery} onResetQuery={resetChartQuery} onBack={goToMarkets} />
         </>
       ) : null}

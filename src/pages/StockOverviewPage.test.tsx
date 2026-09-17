@@ -6,6 +6,7 @@ import { ApiError } from '../api/client'
 import { fetchStockBars } from '../api/stockBars'
 import { fetchStockFinancials } from '../api/stockFinancials'
 import { fetchStockOverview } from '../api/stockOverview'
+import { fetchStockValuation } from '../api/stockValuation'
 import { StockOverviewPage } from './StockOverviewPage'
 
 vi.mock('../api/stockOverview', () => ({
@@ -22,10 +23,15 @@ vi.mock('../api/stockFinancials', () => ({
   financialRanges: ['3y', '5y'],
   fetchStockFinancials: vi.fn(),
 }))
+vi.mock('../api/stockValuation', () => ({
+  valuationRanges: ['3y', '5y'],
+  fetchStockValuation: vi.fn(),
+}))
 
 const fetchStockOverviewMock = vi.mocked(fetchStockOverview)
 const fetchStockBarsMock = vi.mocked(fetchStockBars)
 const fetchStockFinancialsMock = vi.mocked(fetchStockFinancials)
+const fetchStockValuationMock = vi.mocked(fetchStockValuation)
 
 const stockOverview = {
   symbol: '000001.SZ',
@@ -81,6 +87,48 @@ const stockFinancials = {
     },
   ],
   source: { mode: 'demo' as const, provider: 'mysql-demo-fixture' as const, seed_version: 'fnd-003-demo-v7', as_of: '2024-06-28' },
+}
+
+const valuationMetric = (value: string, position: 'low' | 'middle' | 'high' | null, percentile: string | null) => ({
+  current: { value, as_of: '2024-06-28', basis: 'ttm' as const },
+  history: [{ as_of: '2023-06-28', value }, { as_of: '2024-06-28', value }],
+  percentile: { value: percentile, sample_size: percentile === null ? 0 : 2, range_from: percentile === null ? null : '2023-06-28', range_to: percentile === null ? null : '2024-06-28', method: 'inclusive_rank' as const },
+  position,
+})
+
+const stockValuation = {
+  symbol: '000001.SZ',
+  name: '平安银行',
+  requested_range: '5y' as const,
+  effective_range: { from: '2023-06-28', to: '2024-06-28' },
+  as_of: '2024-06-28',
+  metrics: {
+    pe_ttm: valuationMetric('7.40', 'high', '100.00'),
+    pb: { ...valuationMetric('0.52', null, null), current: { value: '0.52', as_of: '2024-06-28', basis: 'latest_daily_basic' as const } },
+    ps_ttm: valuationMetric('1.40', 'middle', '50.00'),
+  },
+  industry_comparisons: [{
+    industry: { code: 'BANK', name: '银行' },
+    as_of: '2024-06-28',
+    metrics: {
+      pe_ttm: { value: '6.00', sample_size: 3 },
+      pb: { value: null, sample_size: 1 },
+      ps_ttm: { value: '1.20', sample_size: 3 },
+    },
+  }],
+  source: { mode: 'demo' as const, provider: 'mysql-demo-fixture' as const, seed_version: 'fnd-003-demo-v8', as_of: '2024-06-28' },
+}
+
+const emptyValuation = {
+  ...stockValuation,
+  effective_range: { from: null, to: null },
+  as_of: null,
+  metrics: {
+    pe_ttm: { current: { value: null, as_of: null, basis: null }, history: [], percentile: { value: null, sample_size: 0, range_from: null, range_to: null, method: 'inclusive_rank' as const }, position: null },
+    pb: { current: { value: null, as_of: null, basis: null }, history: [], percentile: { value: null, sample_size: 0, range_from: null, range_to: null, method: 'inclusive_rank' as const }, position: null },
+    ps_ttm: { current: { value: null, as_of: null, basis: null }, history: [], percentile: { value: null, sample_size: 0, range_from: null, range_to: null, method: 'inclusive_rank' as const }, position: null },
+  },
+  industry_comparisons: [],
 }
 
 const stockBars = {
@@ -148,6 +196,10 @@ describe('StockOverviewPage', () => {
       period: request.period,
       requested_range: request.range,
     }))
+    fetchStockValuationMock.mockImplementation(async (_symbol, request) => ({
+      ...stockValuation,
+      requested_range: request.range,
+    }))
   })
 
   it('shows a loading state while requesting the raw route symbol', () => {
@@ -165,13 +217,13 @@ describe('StockOverviewPage', () => {
 
     expect(await screen.findByRole('heading', { name: '平安银行' })).toBeInTheDocument()
     expect(screen.getByText('000001.SZ')).toBeInTheDocument()
-    expect(screen.getByText('银行')).toBeInTheDocument()
+    expect(screen.getAllByText('银行').length).toBeGreaterThan(0)
     expect(screen.getByText('10.31')).toBeInTheDocument()
     expect(screen.getByText('+0.09')).toBeInTheDocument()
     expect(screen.getByText('+0.88%')).toBeInTheDocument()
     expect(screen.getAllByText('上涨').length).toBeGreaterThan(0)
-    expect(screen.getByText('PE（TTM）')).toBeInTheDocument()
-    expect(screen.getByText('滚动十二个月 · ttm')).toBeInTheDocument()
+    expect(screen.getAllByText('PE（TTM）').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('滚动十二个月 · ttm').length).toBeGreaterThan(0)
     expect(screen.getByText('最新报告期 · latest_report')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '近 20 个交易日收盘价折线' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '近 20 个交易日 K 线（开盘、最高、最低、收盘）' })).toBeInTheDocument()
@@ -232,6 +284,65 @@ describe('StockOverviewPage', () => {
 
     expect(await screen.findByText('所选口径和范围暂无财务数据，请调整查询范围后重试。')).toBeInTheDocument()
     expect(screen.queryByText('最新财务摘要')).not.toBeInTheDocument()
+  })
+
+  it('renders valuation metrics and restores the range from the URL', async () => {
+    const user = userEvent.setup()
+    renderStockPage('/stocks/000001.SZ?valuation_range=3y')
+
+    const valuationSection = await screen.findByRole('region', { name: '估值' })
+    expect(within(valuationSection).getByLabelText('估值历史范围')).toHaveValue('3y')
+    expect(within(valuationSection).getByText('7.40x')).toBeInTheDocument()
+    expect(within(valuationSection).getByText('相对自身历史偏高')).toBeInTheDocument()
+    expect(within(valuationSection).getByText('行业有效同行样本不足（1）')).toBeInTheDocument()
+    expect(fetchStockValuationMock).toHaveBeenCalledWith(
+      '000001.SZ',
+      { range: '3y' },
+      expect.any(AbortSignal),
+    )
+
+    await user.selectOptions(within(valuationSection).getByLabelText('估值历史范围'), '5y')
+    expect(fetchStockValuationMock).toHaveBeenLastCalledWith(
+      '000001.SZ',
+      { range: '5y' },
+      expect.any(AbortSignal),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent('valuation_range=5y')
+  })
+
+  it('recovers an invalid valuation URL without requesting an invalid range', async () => {
+    renderStockPage('/stocks/000001.SZ?valuation_range=10y')
+
+    const valuationSection = await screen.findByRole('region', { name: '估值' })
+    expect(within(valuationSection).getByLabelText('估值历史范围')).toHaveValue('5y')
+    expect(within(valuationSection).getByText('URL 中的 valuation_range 无效，已恢复为默认范围。')).toBeInTheDocument()
+    expect(fetchStockValuationMock).toHaveBeenLastCalledWith(
+      '000001.SZ',
+      { range: '5y' },
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('shows a recoverable empty valuation result without synthesizing metrics', async () => {
+    fetchStockValuationMock.mockResolvedValueOnce(emptyValuation)
+
+    renderStockPage()
+
+    const valuationSection = await screen.findByRole('region', { name: '估值' })
+    expect(within(valuationSection).getByText('所选范围暂无可用估值数据')).toBeInTheDocument()
+    expect(within(valuationSection).queryByText('7.40x')).not.toBeInTheDocument()
+  })
+
+  it('keeps valuation errors isolated and retryable', async () => {
+    const user = userEvent.setup()
+    fetchStockValuationMock.mockRejectedValueOnce(new ApiError('network', '无法连接 API 服务'))
+
+    renderStockPage()
+
+    const valuationSection = await screen.findByRole('region', { name: '估值' })
+    expect(await within(valuationSection).findByRole('alert')).toHaveTextContent('估值数据暂不可用')
+    await user.click(within(valuationSection).getByRole('button', { name: '重试加载估值' }))
+    expect(await within(valuationSection).findByText('行业同行比较')).toBeInTheDocument()
   })
 
   it('renders the research chart and requests URL-restored range, adjustment, and benchmark state', async () => {
@@ -377,7 +488,7 @@ describe('StockOverviewPage', () => {
     expect(screen.getByText('接口已响应，但暂无可用的 20 日 OHLC 走势。')).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: '近 20 个交易日收盘价折线' })).not.toBeInTheDocument()
     expect(screen.getAllByText('2024-06-28').length).toBeGreaterThan(0)
-    expect(screen.getByText('滚动十二个月 · ttm')).toBeInTheDocument()
+    expect(screen.getAllByText('滚动十二个月 · ttm').length).toBeGreaterThan(0)
   })
 
   it('maps invalid symbols to a recoverable 400 state', async () => {
