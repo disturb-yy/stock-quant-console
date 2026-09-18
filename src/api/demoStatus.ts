@@ -4,7 +4,7 @@ import type { DemoStatus } from './types'
 export type { DemoCounts, DemoSampleStock, DemoStatus } from './types'
 
 const modes = ['demo', 'real', 'fallback'] as const
-const providers = ['mysql-demo-fixture', 'external-real-provider', 'local-fixture-fallback'] as const
+const providers = ['mysql-demo-fixture', 'tushare', 'external-real-provider', 'local-fixture-fallback'] as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null

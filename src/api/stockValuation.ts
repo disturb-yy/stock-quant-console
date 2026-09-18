@@ -60,6 +60,7 @@ function isValuationSource(value: unknown): value is StockValuationSource {
   if (!isRecord(value)) return false
   return (value.mode === 'demo' || value.mode === 'real' || value.mode === 'fallback')
     && (value.provider === 'mysql-demo-fixture'
+      || value.provider === 'tushare'
       || value.provider === 'external-real-provider'
       || value.provider === 'local-fixture-fallback')
     && typeof value.seed_version === 'string'

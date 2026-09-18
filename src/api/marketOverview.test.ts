@@ -33,4 +33,13 @@ describe('fetchMarketOverview', () => {
     await expect(fetchMarketOverview()).rejects.toMatchObject<Partial<ApiError>>({ kind: 'invalid-payload' })
     expect(isMarketOverview({ ...overview, breadth: null })).toBe(false)
   })
+
+  it('accepts the live Tushare source metadata', () => {
+    const tushareOverview = {
+      ...overview,
+      source: { ...overview.source, mode: 'real' as const, provider: 'tushare' as const, seed_version: 'tushare-20260917' },
+    }
+
+    expect(isMarketOverview(tushareOverview)).toBe(true)
+  })
 })
