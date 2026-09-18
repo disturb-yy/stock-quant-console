@@ -1,5 +1,15 @@
 import { apiRequest, isApiErrorResponse, type PayloadValidator } from './client'
-import type { PaginationMeta, StockPool, StockPoolCreateRequest, StockPoolListResponse } from './types'
+import type {
+  PaginationMeta,
+  StockPool,
+  StockPoolCreateRequest,
+  StockPoolListResponse,
+  StockPoolMember,
+  StockPoolMemberAddRequest,
+  StockPoolMemberAddResponse,
+  StockPoolMemberDeleteResponse,
+  StockPoolMemberListResponse,
+} from './types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -9,6 +19,8 @@ function isPaginationMeta(value: unknown): value is PaginationMeta {
   if (!isRecord(value)) return false
   return ['page', 'page_size', 'total', 'total_pages'].every((key) => typeof value[key] === 'number' && Number.isInteger(value[key]))
 }
+
+const stockPoolMemberSymbolPattern = /^[A-Za-z0-9]{1,16}\.[A-Za-z]{2,8}$/
 
 export const isStockPool: PayloadValidator<StockPool> = (value): value is StockPool => {
   if (!isRecord(value)) return false
@@ -28,6 +40,33 @@ export const isStockPool: PayloadValidator<StockPool> = (value): value is StockP
 export const isStockPoolListResponse: PayloadValidator<StockPoolListResponse> = (value): value is StockPoolListResponse => {
   if (!isRecord(value) || !Array.isArray(value.data) || !isPaginationMeta(value.pagination)) return false
   return value.data.every(isStockPool)
+}
+
+export const isStockPoolMember: PayloadValidator<StockPoolMember> = (value): value is StockPoolMember => {
+  if (!isRecord(value)) return false
+  return typeof value.symbol === 'string' && stockPoolMemberSymbolPattern.test(value.symbol) && typeof value.name === 'string'
+}
+
+export const isStockPoolMemberListResponse: PayloadValidator<StockPoolMemberListResponse> = (value): value is StockPoolMemberListResponse => {
+  if (!isRecord(value) || !Array.isArray(value.data) || !isPaginationMeta(value.pagination)) return false
+  return value.data.every(isStockPoolMember)
+}
+
+export const isStockPoolMemberAddResponse: PayloadValidator<StockPoolMemberAddResponse> = (value): value is StockPoolMemberAddResponse => {
+  if (!isRecord(value)) return false
+  return isStockPoolMember(value.member)
+    && typeof value.member_count === 'number'
+    && Number.isInteger(value.member_count)
+    && value.member_count >= 0
+}
+
+export const isStockPoolMemberDeleteResponse: PayloadValidator<StockPoolMemberDeleteResponse> = (value): value is StockPoolMemberDeleteResponse => {
+  if (!isRecord(value)) return false
+  return typeof value.symbol === 'string'
+    && stockPoolMemberSymbolPattern.test(value.symbol)
+    && typeof value.member_count === 'number'
+    && Number.isInteger(value.member_count)
+    && value.member_count >= 0
 }
 
 export async function createStockPool(request: StockPoolCreateRequest, signal?: AbortSignal): Promise<StockPool> {
@@ -56,6 +95,35 @@ export async function getStockPool(id: number, signal?: AbortSignal): Promise<St
     method: 'GET',
     signal,
     validateResponse: isStockPool,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function listStockPoolMembers(id: number, page = 1, pageSize = 20, signal?: AbortSignal): Promise<StockPoolMemberListResponse> {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  return apiRequest<StockPoolMemberListResponse>(`/api/v1/stock-pools/${encodeURIComponent(String(id))}/members?${params.toString()}`, {
+    method: 'GET',
+    signal,
+    validateResponse: isStockPoolMemberListResponse,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function addStockPoolMember(id: number, request: StockPoolMemberAddRequest, signal?: AbortSignal): Promise<StockPoolMemberAddResponse> {
+  return apiRequest<StockPoolMemberAddResponse>(`/api/v1/stock-pools/${encodeURIComponent(String(id))}/members`, {
+    method: 'POST',
+    signal,
+    json: request,
+    validateResponse: isStockPoolMemberAddResponse,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function deleteStockPoolMember(id: number, symbol: string, signal?: AbortSignal): Promise<StockPoolMemberDeleteResponse> {
+  return apiRequest<StockPoolMemberDeleteResponse>(`/api/v1/stock-pools/${encodeURIComponent(String(id))}/members/${encodeURIComponent(symbol)}`, {
+    method: 'DELETE',
+    signal,
+    validateResponse: isStockPoolMemberDeleteResponse,
     parseError: isApiErrorResponse,
   })
 }

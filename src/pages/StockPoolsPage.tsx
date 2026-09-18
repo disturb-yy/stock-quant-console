@@ -4,11 +4,20 @@ import { Button } from 'tdesign-react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { describeApiError, formatBackendApiError, isApiAbortError } from '../api/client'
 import {
+  addStockPoolMember,
   createStockPool,
+  deleteStockPoolMember,
   getStockPool,
+  listStockPoolMembers,
   listStockPools,
 } from '../api/stockPools'
-import type { StockPool, StockPoolCreateRequest, StockPoolListResponse } from '../api/types'
+import type {
+  StockPool,
+  StockPoolCreateRequest,
+  StockPoolListResponse,
+  StockPoolMember,
+  StockPoolMemberListResponse,
+} from '../api/types'
 import { ErrorState, EmptyState, LoadingState } from '../components/PageState'
 
 export const stockPoolListPath = '/research/stock-pools'
@@ -27,6 +36,24 @@ type DetailState =
   | { readonly status: 'loading' }
   | { readonly status: 'success'; readonly data: StockPool }
   | { readonly status: 'error'; readonly error: unknown }
+
+type MemberListState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'success'; readonly data: StockPoolMemberListResponse }
+  | { readonly status: 'error'; readonly error: unknown }
+
+type MemberFeedback =
+  | { readonly tone: 'success'; readonly message: string }
+  | { readonly tone: 'error'; readonly message: string }
+
+type BatchMemberResult =
+  | { readonly symbol: string; readonly status: 'success' }
+  | { readonly symbol: string; readonly status: 'error'; readonly error: unknown }
+
+type BatchState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'loading'; readonly symbols: ReadonlyArray<string> }
+  | { readonly status: 'complete'; readonly results: ReadonlyArray<BatchMemberResult> }
 
 function parsePage(raw: string | null) {
   if (raw === null || raw === '') return { page: 1, invalidReason: null }
@@ -274,6 +301,223 @@ export function StockPoolDetailPage() {
   )
 }
 
+function StockPoolMemberPagination({ data, onPageChange }: { readonly data: StockPoolMemberListResponse; readonly onPageChange: (page: number) => void }) {
+  const { page, total, total_pages: totalPages } = data.pagination
+  if (totalPages < 1) return null
+  return (
+    <div className="stock-pool-members-pagination" aria-label="股票池成员分页">
+      <span>第 {page} / {totalPages} 页 · 共 {total} 个成员</span>
+      <div>
+        <button type="button" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>上一页</button>
+        <button type="button" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages}>下一页</button>
+      </div>
+    </div>
+  )
+}
+
+function StockPoolMemberTable({
+  members,
+  selectedSymbols,
+  onToggle,
+  onToggleAll,
+  onDelete,
+  deletingSymbols,
+  batchRunning,
+}: {
+  readonly members: ReadonlyArray<StockPoolMember>
+  readonly selectedSymbols: ReadonlyArray<string>
+  readonly onToggle: (symbol: string, checked: boolean) => void
+  readonly onToggleAll: (checked: boolean) => void
+  readonly onDelete: (symbol: string) => void
+  readonly deletingSymbols: Readonly<Record<string, boolean>>
+  readonly batchRunning: boolean
+}) {
+  const allSelected = members.length > 0 && members.every((member) => selectedSymbols.includes(member.symbol))
+  return (
+    <div className="stock-pool-members-table-wrap">
+      <table className="stock-pool-members-table" aria-label="股票池成员表">
+        <thead>
+          <tr>
+            <th scope="col" className="stock-pool-members-select-column">
+              <input type="checkbox" aria-label="选择当前页全部成员" checked={allSelected} onChange={(event) => onToggleAll(event.target.checked)} />
+            </th>
+            <th scope="col">股票代码</th><th scope="col">股票名称</th><th scope="col"><span className="sr-only">操作</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map((member) => {
+            const deleting = deletingSymbols[member.symbol] || batchRunning
+            return (
+              <tr key={member.symbol}>
+                <td className="stock-pool-members-select-column">
+                  <input type="checkbox" aria-label={`选择 ${member.symbol}`} checked={selectedSymbols.includes(member.symbol)} disabled={deleting} onChange={(event) => onToggle(member.symbol, event.target.checked)} />
+                </td>
+                <th scope="row"><Link className="stock-pool-member-symbol-link" to={`/stocks/${encodeURIComponent(member.symbol)}`}>{member.symbol}</Link></th>
+                <td>{member.name}</td>
+                <td><button type="button" className="stock-pool-member-delete" disabled={deleting} onClick={() => onDelete(member.symbol)}>{deleting ? '删除中…' : '删除'}</button></td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function StockPoolBatchResult({ state }: { readonly state: BatchState }) {
+  if (state.status !== 'complete') return null
+  const successCount = state.results.filter((result) => result.status === 'success').length
+  const failureCount = state.results.length - successCount
+  return (
+    <div className={`stock-pool-batch-result ${failureCount > 0 ? 'stock-pool-batch-result--partial' : ''}`} role={failureCount > 0 ? 'alert' : 'status'}>
+      <p>{successCount} 项删除成功，{failureCount} 项失败；成员表已从服务端重新同步。</p>
+      <ul>
+        {state.results.map((result) => (
+          <li key={result.symbol}>
+            <code>{result.symbol}</code>：{result.status === 'success' ? '已删除' : `删除失败：${createErrorMessage(result.error)}`}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function StockPoolMembersPanel({ data, onRefresh }: { readonly data: StockPool; readonly onRefresh: () => void }) {
+  const [memberPage, setMemberPage] = useState(1)
+  const [memberRefreshToken, setMemberRefreshToken] = useState(0)
+  const [state, setState] = useState<MemberListState>({ status: 'loading' })
+  const [symbol, setSymbol] = useState('')
+  const [addValidationMessage, setAddValidationMessage] = useState('')
+  const [addState, setAddState] = useState<MemberFeedback | { readonly tone: 'idle' } | { readonly tone: 'loading' }>({ tone: 'idle' })
+  const [memberFeedback, setMemberFeedback] = useState<MemberFeedback | null>(null)
+  const [selectedSymbols, setSelectedSymbols] = useState<ReadonlyArray<string>>([])
+  const [deletingSymbols, setDeletingSymbols] = useState<Record<string, boolean>>({})
+  const [batchState, setBatchState] = useState<BatchState>({ status: 'idle' })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setState({ status: 'loading' })
+    listStockPoolMembers(data.id, memberPage, 20, controller.signal)
+      .then((response) => setState({ status: 'success', data: response }))
+      .catch((error) => { if (!isApiAbortError(error)) setState({ status: 'error', error }) })
+    return () => controller.abort()
+  }, [data.id, memberPage, memberRefreshToken])
+
+  function refreshMembers() {
+    setSelectedSymbols([])
+    setMemberRefreshToken((current) => current + 1)
+  }
+
+  async function submitMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const normalizedSymbol = symbol.trim()
+    if (!normalizedSymbol) {
+      setAddValidationMessage('请输入 Markets 返回的原始股票代码。')
+      return
+    }
+    setAddValidationMessage('')
+    setMemberFeedback(null)
+    setAddState({ tone: 'loading' })
+    try {
+      const response = await addStockPoolMember(data.id, { symbol: normalizedSymbol })
+      setSymbol('')
+      setAddState({ tone: 'success', message: `已添加 ${response.member.symbol}，服务端成员数为 ${response.member_count}。` })
+      onRefresh()
+      refreshMembers()
+    } catch (error) {
+      if (!isApiAbortError(error)) setAddState({ tone: 'error', message: `添加失败：${createErrorMessage(error)}` })
+    }
+  }
+
+  async function deleteMember(symbolToDelete: string) {
+    setBatchState({ status: 'idle' })
+    setMemberFeedback(null)
+    setDeletingSymbols((current) => ({ ...current, [symbolToDelete]: true }))
+    try {
+      const response = await deleteStockPoolMember(data.id, symbolToDelete)
+      setMemberFeedback({ tone: 'success', message: `已删除 ${response.symbol}，服务端成员数为 ${response.member_count}。` })
+      onRefresh()
+      refreshMembers()
+    } catch (error) {
+      if (!isApiAbortError(error)) setMemberFeedback({ tone: 'error', message: `删除失败：${createErrorMessage(error)}` })
+    } finally {
+      setDeletingSymbols((current) => {
+        const next = { ...current }
+        delete next[symbolToDelete]
+        return next
+      })
+    }
+  }
+
+  async function deleteSelectedMembers() {
+    const symbols = [...selectedSymbols]
+    if (symbols.length === 0) return
+    setMemberFeedback(null)
+    setBatchState({ status: 'loading', symbols })
+    const results: BatchMemberResult[] = []
+    for (const symbolToDelete of symbols) {
+      try {
+        await deleteStockPoolMember(data.id, symbolToDelete)
+        results.push({ symbol: symbolToDelete, status: 'success' })
+      } catch (error) {
+        if (!isApiAbortError(error)) results.push({ symbol: symbolToDelete, status: 'error', error })
+      }
+    }
+    setBatchState({ status: 'complete', results })
+    setSelectedSymbols([])
+    onRefresh()
+    refreshMembers()
+  }
+
+  function toggleMember(symbolToToggle: string, checked: boolean) {
+    setSelectedSymbols((current) => checked
+      ? current.includes(symbolToToggle) ? current : [...current, symbolToToggle]
+      : current.filter((item) => item !== symbolToToggle))
+  }
+
+  function toggleAllMembers(checked: boolean) {
+    if (state.status !== 'success') return
+    setSelectedSymbols(checked ? state.data.data.map((member) => member.symbol) : [])
+  }
+
+  const selectedCount = selectedSymbols.length
+  const batchRunning = batchState.status === 'loading'
+  return (
+    <section className="stock-pool-members-panel" aria-labelledby="stock-pool-members-heading">
+      <div className="stock-pools-panel-heading">
+        <div><p className="stock-pools-section-kicker">MEMBERS / SERVER SET</p><h2 id="stock-pool-members-heading">股票池成员</h2></div>
+        <span className="stock-pools-source">按 symbol 升序</span>
+      </div>
+      <p className="stock-pools-panel-description">成员、名称和成员数均来自服务端；股票详情使用原始 symbol 打开。</p>
+      <form className="stock-pool-member-add-form" onSubmit={submitMember}>
+        <label htmlFor="stock-pool-member-symbol">添加股票</label>
+        <div className="stock-pool-member-add-controls">
+          <input id="stock-pool-member-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="例如 000001.SZ" autoComplete="off" />
+          <Button theme="primary" type="submit" loading={addState.tone === 'loading'} disabled={addState.tone === 'loading' || batchRunning}>添加成员</Button>
+        </div>
+        <p className="stock-pool-member-input-hint">仅提交 Markets API 返回的原始 code，不按名称或排名转换。</p>
+      </form>
+      {addValidationMessage ? <p className="stock-pools-inline-error" role="alert">{addValidationMessage}</p> : null}
+      {addState.tone === 'success' || addState.tone === 'error' ? <p className={`stock-pool-member-feedback stock-pool-member-feedback--${addState.tone}`} role={addState.tone === 'error' ? 'alert' : 'status'}>{addState.message}</p> : null}
+      {memberFeedback ? <p className={`stock-pool-member-feedback stock-pool-member-feedback--${memberFeedback.tone}`} role={memberFeedback.tone === 'error' ? 'alert' : 'status'}>{memberFeedback.message}</p> : null}
+      <StockPoolBatchResult state={batchState} />
+      {state.status === 'loading' ? <LoadingState label="正在请求股票池成员" /> : null}
+      {state.status === 'error' ? <ErrorState error={state.error} title="股票池成员暂不可用" hint="成员表没有回退数据，请检查服务后重试。" actionLabel="重试读取成员" onRetry={refreshMembers} /> : null}
+      {state.status === 'success' && state.data.data.length === 0 ? <EmptyState description="当前股票池没有服务端成员。可使用上方输入框添加真实股票。" /> : null}
+      {state.status === 'success' && state.data.data.length > 0 ? (
+        <>
+          <div className="stock-pool-members-toolbar">
+            <span>当前页已选择 {selectedCount} 项</span>
+            <button type="button" className="stock-pool-member-batch-delete" disabled={selectedCount === 0 || batchRunning} onClick={deleteSelectedMembers}>{batchRunning ? '逐项删除中…' : '移除所选成员'}</button>
+          </div>
+          <StockPoolMemberTable members={state.data.data} selectedSymbols={selectedSymbols} onToggle={toggleMember} onToggleAll={toggleAllMembers} onDelete={deleteMember} deletingSymbols={deletingSymbols} batchRunning={batchRunning} />
+          <StockPoolMemberPagination data={state.data} onPageChange={(page) => { setSelectedSymbols([]); setMemberPage(page) }} />
+        </>
+      ) : null}
+    </section>
+  )
+}
+
 function StockPoolDetail({ data, onRefresh }: { readonly data: StockPool; readonly onRefresh: () => void }) {
   return (
     <>
@@ -292,6 +536,7 @@ function StockPoolDetail({ data, onRefresh }: { readonly data: StockPool; readon
           <div><dt>创建时间</dt><dd>{formatPoolTime(data.created_at)}</dd></div>
         </dl>
       </section>
+      <StockPoolMembersPanel data={data} onRefresh={onRefresh} />
     </>
   )
 }
