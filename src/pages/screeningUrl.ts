@@ -9,6 +9,7 @@ export const defaultScreeningSpec: ScreenerSpec = {
 
 export const screeningQueryKey = 'screening_spec'
 export const screeningQueryMaxLength = 4096
+export const screenerQueryKey = 'screener_id'
 
 export function serializeScreeningSpec(spec: ScreenerSpec): string {
   return JSON.stringify({
@@ -26,6 +27,21 @@ export function serializeScreeningSpec(spec: ScreenerSpec): string {
 export interface ParsedScreeningUrl {
   readonly spec: ScreenerSpec
   readonly invalidReason: string | null
+}
+
+export interface ParsedScreenerId {
+  readonly id: number | null
+  readonly invalidReason: string | null
+}
+
+export function readScreenerId(searchParams: URLSearchParams): ParsedScreenerId {
+  const raw = searchParams.get(screenerQueryKey)
+  if (raw === null) return { id: null, invalidReason: null }
+  if (!/^\d+$/.test(raw)) return { id: null, invalidReason: 'URL 中的保存方案 ID 无效。' }
+
+  const id = Number(raw)
+  if (!Number.isSafeInteger(id) || id < 1) return { id: null, invalidReason: 'URL 中的保存方案 ID 无效。' }
+  return { id, invalidReason: null }
 }
 
 export function readScreeningSpec(searchParams: URLSearchParams): ParsedScreeningUrl {

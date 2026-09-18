@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './client'
 import {
+  createScreener,
+  getScreener,
   isCompleteScreenerSpec,
+  isScreenerListResponse,
+  isScreenerResponse,
   isScreenerRunResponse,
+  listScreeners,
   runScreener,
+  updateScreener,
+  type Screener,
   type ScreenerRunResponse,
 } from './screener'
 import { defaultScreeningSpec } from '../pages/screeningUrl'
@@ -23,6 +30,16 @@ const response: ScreenerRunResponse = {
     fields: [],
   }],
   source: { mode: 'demo', provider: 'mysql-demo-fixture', seed_version: 'fnd-003-demo-v8', as_of: '2024-06-28' },
+}
+
+const savedResponse: Screener = {
+  id: 7,
+  name: '低估值方案',
+  description: '仅保存条件',
+  spec: defaultScreeningSpec,
+  version: 1,
+  created_at: '2026-09-18T05:00:00Z',
+  updated_at: '2026-09-18T05:00:00Z',
 }
 
 describe('screener API contract', () => {
@@ -69,5 +86,29 @@ describe('screener API contract', () => {
     ))
 
     await expect(runScreener(defaultScreeningSpec)).rejects.toMatchObject<Partial<ApiError>>({ kind: 'backend', status: 400 })
+  })
+
+  it('validates and uses the generated saved-screener CRUD contract', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(savedResponse), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [savedResponse], pagination: { page: 2, page_size: 10, total: 1, total_pages: 1 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(savedResponse), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...savedResponse, version: 2 }), { status: 200 }))
+
+    await expect(createScreener({ name: savedResponse.name, description: savedResponse.description, spec: savedResponse.spec })).resolves.toEqual(savedResponse)
+    await expect(listScreeners(2, 10)).resolves.toMatchObject({ data: [savedResponse] })
+    await expect(getScreener(7)).resolves.toEqual(savedResponse)
+    await expect(updateScreener(7, { name: savedResponse.name, description: savedResponse.description, spec: savedResponse.spec, version: 1 })).resolves.toMatchObject({ version: 2 })
+
+    expect(fetchSpy.mock.calls.map(([path, init]) => [path, init?.method])).toEqual([
+      ['/api/v1/screeners', 'POST'],
+      ['/api/v1/screeners?page=2&page_size=10', 'GET'],
+      ['/api/v1/screeners/7', 'GET'],
+      ['/api/v1/screeners/7', 'PUT'],
+    ])
+    expect(isScreenerResponse(savedResponse)).toBe(true)
+    expect(isScreenerListResponse({ data: [savedResponse], pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 } })).toBe(true)
+    expect(isScreenerResponse({ ...savedResponse, version: 0 })).toBe(false)
+    expect(isScreenerListResponse({ data: [savedResponse], pagination: { page: 0, page_size: 20, total: 1, total_pages: 1 } })).toBe(false)
   })
 })

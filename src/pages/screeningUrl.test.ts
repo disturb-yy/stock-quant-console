@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   defaultScreeningSpec,
+  readScreenerId,
   readScreeningSpec,
   serializeScreeningSpec,
+  screenerQueryKey,
   screeningQueryKey,
 } from './screeningUrl'
 
@@ -29,5 +31,11 @@ describe('screening URL state', () => {
 
     expect(result.spec).toEqual(defaultScreeningSpec)
     expect(result.invalidReason).toContain('过长')
+  })
+
+  it('accepts only positive safe integer saved-plan IDs', () => {
+    expect(readScreenerId(new URLSearchParams([[screenerQueryKey, '7']]))).toEqual({ id: 7, invalidReason: null })
+    expect(readScreenerId(new URLSearchParams([[screenerQueryKey, '0']])).invalidReason).toContain('无效')
+    expect(readScreenerId(new URLSearchParams([[screenerQueryKey, 'not-a-number']])).invalidReason).toContain('无效')
   })
 })

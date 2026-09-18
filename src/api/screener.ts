@@ -1,7 +1,10 @@
 import { apiRequest, isApiErrorResponse, type PayloadValidator } from './client'
 import type {
+  Screener,
+  ScreenerCreateRequest,
   ScreenerFieldResult,
   ScreenerFilter,
+  ScreenerListResponse,
   ScreenerRanking,
   ScreenerRankingResult,
   ScreenerResult,
@@ -10,11 +13,15 @@ import type {
   ScreenerSnapshot,
   ScreenerSource,
   ScreenerUniverse,
+  ScreenerUpdateRequest,
 } from './types'
 
 export type {
+  Screener,
+  ScreenerCreateRequest,
   ScreenerFieldResult,
   ScreenerFilter,
+  ScreenerListResponse,
   ScreenerRanking,
   ScreenerRankingResult,
   ScreenerResult,
@@ -23,6 +30,7 @@ export type {
   ScreenerSnapshot,
   ScreenerSource,
   ScreenerUniverse,
+  ScreenerUpdateRequest,
 } from './types'
 
 export type ScreenerFieldId = ScreenerFilter['field_id']
@@ -175,6 +183,38 @@ function isScreenerUniverse(value: unknown): value is ScreenerUniverse {
     && value.eligible_count >= 0
 }
 
+function isScreener(value: unknown): value is Screener {
+  return isRecord(value)
+    && typeof value.id === 'number'
+    && Number.isInteger(value.id)
+    && value.id > 0
+    && isNonEmptyString(value.name)
+    && isNullableString(value.description)
+    && isCompleteScreenerSpec(value.spec)
+    && typeof value.version === 'number'
+    && Number.isInteger(value.version)
+    && value.version > 0
+    && typeof value.created_at === 'string'
+    && typeof value.updated_at === 'string'
+}
+
+export const isScreenerResponse: PayloadValidator<Screener> = (value): value is Screener => isScreener(value)
+
+export const isScreenerListResponse: PayloadValidator<ScreenerListResponse> = (value): value is ScreenerListResponse => {
+  if (!isRecord(value) || !Array.isArray(value.data) || !value.data.every(isScreener)) return false
+  if (!isRecord(value.pagination)) return false
+  const pagination = value.pagination
+  const nonNegativeFields = ['total', 'total_pages']
+  if (!['page', 'page_size'].every((key) => {
+    const field = pagination[key]
+    return typeof field === 'number' && Number.isInteger(field) && field >= 1
+  })) return false
+  return nonNegativeFields.every((key) => {
+    const field = pagination[key]
+    return typeof field === 'number' && Number.isInteger(field) && field >= 0
+  })
+}
+
 export const isScreenerRunResponse: PayloadValidator<ScreenerRunResponse> = (value): value is ScreenerRunResponse => {
   if (!isRecord(value) || !isCompleteScreenerSpec(value.spec) || !isScreenerSnapshot(value.snapshot)) return false
   return typeof value.matched_count === 'number'
@@ -195,6 +235,45 @@ export async function runScreener(spec: ScreenerSpec, signal?: AbortSignal): Pro
     signal,
     json: { spec },
     validateResponse: isScreenerRunResponse,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function createScreener(request: ScreenerCreateRequest, signal?: AbortSignal): Promise<Screener> {
+  return apiRequest<Screener>('/api/v1/screeners', {
+    method: 'POST',
+    signal,
+    json: request,
+    validateResponse: isScreenerResponse,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function listScreeners(page = 1, pageSize = 20, signal?: AbortSignal): Promise<ScreenerListResponse> {
+  const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  return apiRequest<ScreenerListResponse>(`/api/v1/screeners?${query.toString()}`, {
+    method: 'GET',
+    signal,
+    validateResponse: isScreenerListResponse,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function getScreener(id: number, signal?: AbortSignal): Promise<Screener> {
+  return apiRequest<Screener>(`/api/v1/screeners/${id}`, {
+    method: 'GET',
+    signal,
+    validateResponse: isScreenerResponse,
+    parseError: isApiErrorResponse,
+  })
+}
+
+export async function updateScreener(id: number, request: ScreenerUpdateRequest, signal?: AbortSignal): Promise<Screener> {
+  return apiRequest<Screener>(`/api/v1/screeners/${id}`, {
+    method: 'PUT',
+    signal,
+    json: request,
+    validateResponse: isScreenerResponse,
     parseError: isApiErrorResponse,
   })
 }

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card } from 'tdesign-react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { isApiAbortError, isApiError, isApiErrorResponse } from '../api/client'
+import { describeApiError, formatBackendApiError, isApiAbortError, isApiError, isApiErrorResponse } from '../api/client'
 import {
+  createScreener,
+  getScreener,
   isCompleteScreenerSpec,
+  listScreeners,
   runScreener,
   screenerCategoryLabels,
   screenerFieldDefinitions,
@@ -11,17 +14,24 @@ import {
   screenerMaxTopN,
   screenerOperatorLabels,
   screenerOperators,
+  updateScreener,
+  type Screener,
+  type ScreenerCreateRequest,
+  type ScreenerListResponse,
   type ScreenerFieldDefinition,
   type ScreenerFieldId,
   type ScreenerFilter,
   type ScreenerOperator,
   type ScreenerRunResponse,
   type ScreenerSpec,
+  type ScreenerUpdateRequest,
 } from '../api/screener'
 import { ErrorState, EmptyState, LoadingState } from '../components/PageState'
 import {
   defaultScreeningSpec,
+  readScreenerId,
   readScreeningSpec,
+  screenerQueryKey,
   screeningQueryKey,
   serializeScreeningSpec,
   isScreeningSpecComplete,
@@ -32,6 +42,57 @@ type RunState =
   | { readonly status: 'loading' }
   | { readonly status: 'success'; readonly data: ScreenerRunResponse }
   | { readonly status: 'error'; readonly error: unknown }
+
+type PlanListState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'success'; readonly data: ScreenerListResponse }
+  | { readonly status: 'error'; readonly error: unknown }
+
+type PlanRequestState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'loading' }
+  | { readonly status: 'success'; readonly message: string }
+  | { readonly status: 'error'; readonly error: unknown }
+
+type PlanLoadState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'loading'; readonly id: number }
+  | { readonly status: 'success'; readonly id: number }
+  | { readonly status: 'error'; readonly id: number | null; readonly error: unknown }
+
+type PlanFormMode = 'create' | 'update' | null
+
+function specsEqual(left: ScreenerSpec, right: ScreenerSpec) {
+  return serializeScreeningSpec(left) === serializeScreeningSpec(right)
+}
+
+function formatPlanTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function planErrorPresentation(error: unknown) {
+  if (isApiError(error)) {
+    const code = isApiErrorResponse(error.payload) ? error.payload.code : undefined
+    if (error.status === 409 || code === 'CONFLICT') {
+      return { title: '方案已更新', hint: '当前版本已过期，未覆盖服务端内容；请重新加载后再比较和编辑。' }
+    }
+    if (error.status === 400 || code === 'VALIDATION_ERROR' || code === 'INVALID_PAGINATION') {
+      return { title: '保存方案参数无效', hint: formatBackendApiError(error.payload, error.status).message }
+    }
+    if (error.status === 404 || code === 'NOT_FOUND') {
+      return { title: '方案不存在', hint: '服务端没有找到该方案；当前 Builder 仍保留为临时编辑态。' }
+    }
+    if (error.status === 503 || error.kind === 'network') {
+      return { title: '保存方案暂不可用', hint: '真实保存服务暂时不可用，请稍后重试。' }
+    }
+    if (error.kind === 'invalid-payload') {
+      return { title: '保存方案响应无效', hint: '服务端返回结构不符合运行中 OpenAPI，请重试或检查后端版本。' }
+    }
+  }
+  return { title: '保存方案请求失败', hint: describeApiError(error, formatBackendApiError).message }
+}
 
 const fieldCategories: ReadonlyArray<ScreenerFieldDefinition['category']> = ['Market', 'Valuation', 'Fundamental', 'Technical']
 
@@ -270,6 +331,196 @@ function BuilderPanel({
   )
 }
 
+function CurrentPlanSummary({
+  screener,
+  dirty,
+  onUpdate,
+}: {
+  readonly screener: Screener
+  readonly dirty: boolean
+  readonly onUpdate: () => void
+}) {
+  return (
+    <div className="screening-current-plan" aria-label="当前保存方案">
+      <div>
+        <span className="screening-section-kicker">CURRENT PLAN</span>
+        <strong>{screener.name}</strong>
+        <span className="screening-current-plan__meta">ID {screener.id} · version {screener.version}</span>
+      </div>
+      <div className="screening-current-plan__actions">
+        <span className={dirty ? 'screening-plan-status screening-plan-status--dirty' : 'screening-plan-status'}>
+          {dirty ? '有未保存更改' : '已保存'}
+        </span>
+        <button type="button" className="screening-secondary-button" onClick={onUpdate}>
+          更新当前方案
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SavedPlanForm({
+  mode,
+  name,
+  description,
+  requestState,
+  onNameChange,
+  onDescriptionChange,
+  onSubmit,
+  onCancel,
+  onReload,
+}: {
+  readonly mode: Exclude<PlanFormMode, null>
+  readonly name: string
+  readonly description: string
+  readonly requestState: PlanRequestState
+  readonly onNameChange: (value: string) => void
+  readonly onDescriptionChange: (value: string) => void
+  readonly onSubmit: () => void
+  readonly onCancel: () => void
+  readonly onReload: () => void
+}) {
+  const errorPresentation = requestState.status === 'error' ? planErrorPresentation(requestState.error) : null
+  const requestError = requestState.status === 'error' ? requestState.error : null
+  return (
+    <form className="screening-plan-form" onSubmit={(event) => { event.preventDefault(); onSubmit() }}>
+      <div className="screening-subheading">
+        <div>
+          <h3>{mode === 'create' ? '保存当前方案' : '更新当前方案'}</h3>
+          <p>{mode === 'create' ? '保存当前合法 Builder spec；结果和快照不会被保存。' : '仅在确认更新后提交当前 spec 和服务端 version。'}</p>
+        </div>
+      </div>
+      <div className="screening-plan-form__fields">
+        <label htmlFor="screening-plan-name" className="screening-control">
+          <span>方案名称</span>
+          <input id="screening-plan-name" aria-label="方案名称" autoFocus maxLength={100} required value={name} onChange={(event) => onNameChange(event.target.value)} />
+          <small>1–100 个字符</small>
+        </label>
+        <label htmlFor="screening-plan-description" className="screening-control">
+          <span>描述（可选）</span>
+          <textarea id="screening-plan-description" aria-label="描述（可选）" maxLength={500} value={description} onChange={(event) => onDescriptionChange(event.target.value)} />
+          <small>最多 500 个字符；不保存执行结果</small>
+        </label>
+      </div>
+      {errorPresentation ? (
+        <div className="screening-plan-error" role="alert">
+          <strong>{errorPresentation.title}</strong>
+          <span>{errorPresentation.hint}</span>
+          {requestError && isApiError(requestError) && (requestError.status === 409 || requestError.status === 404) ? <button type="button" className="screening-text-button" onClick={onReload}>重新加载当前方案</button> : null}
+        </div>
+      ) : null}
+      <div className="screening-plan-form__actions">
+        <Button type="submit" theme="primary" loading={requestState.status === 'loading'} disabled={requestState.status === 'loading'}>
+          {mode === 'create' ? '确认保存' : '确认更新'}
+        </Button>
+        <button type="button" className="screening-secondary-button" onClick={onCancel} disabled={requestState.status === 'loading'}>取消</button>
+      </div>
+    </form>
+  )
+}
+
+function SavedPlanList({
+  state,
+  loadingId,
+  selectedId,
+  onRetry,
+  onLoad,
+}: {
+  readonly state: PlanListState
+  readonly loadingId: number | null
+  readonly selectedId: number | null
+  readonly onRetry: () => void
+  readonly onLoad: (id: number) => void
+}) {
+  if (state.status === 'loading') return <div className="screening-plan-list-message" role="status">正在读取最近方案…</div>
+  if (state.status === 'error') {
+    const error = planErrorPresentation(state.error)
+    return <div className="screening-plan-error" role="alert"><strong>{error.title}</strong><span>{error.hint}</span><button type="button" className="screening-text-button" onClick={onRetry}>重试列表</button></div>
+  }
+  if (state.data.data.length === 0) return <div className="screening-plan-list-message">暂无已保存方案；当前 Builder 仍是临时配置。</div>
+  return (
+    <ul className="screening-plan-list" aria-label="最近方案列表">
+      {state.data.data.map((screener) => (
+        <li key={screener.id} className={selectedId === screener.id ? 'screening-plan-list__item screening-plan-list__item--selected' : 'screening-plan-list__item'}>
+          <div className="screening-plan-list__identity">
+            <strong>{screener.name}</strong>
+            <span>ID {screener.id} · v{screener.version} · 更新于 {formatPlanTime(screener.updated_at)}</span>
+            {screener.description ? <small>{screener.description}</small> : null}
+          </div>
+          <button type="button" className="screening-secondary-button" onClick={() => onLoad(screener.id)} disabled={loadingId !== null}>
+            {loadingId === screener.id ? '加载中…' : '加载'}
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function SavedPlansPanel({
+  currentScreener,
+  dirty,
+  listState,
+  loadState,
+  formMode,
+  formName,
+  formDescription,
+  requestState,
+  selectedId,
+  onRefresh,
+  onLoad,
+  onOpenCreate,
+  onOpenUpdate,
+  onNameChange,
+  onDescriptionChange,
+  onSubmit,
+  onCancel,
+  onReload,
+  onClearSelection,
+}: {
+  readonly currentScreener: Screener | null
+  readonly dirty: boolean
+  readonly listState: PlanListState
+  readonly loadState: PlanLoadState
+  readonly formMode: PlanFormMode
+  readonly formName: string
+  readonly formDescription: string
+  readonly requestState: PlanRequestState
+  readonly selectedId: number | null
+  readonly onRefresh: () => void
+  readonly onLoad: (id: number) => void
+  readonly onOpenCreate: () => void
+  readonly onOpenUpdate: () => void
+  readonly onNameChange: (value: string) => void
+  readonly onDescriptionChange: (value: string) => void
+  readonly onSubmit: () => void
+  readonly onCancel: () => void
+  readonly onReload: () => void
+  readonly onClearSelection: () => void
+}) {
+  const loadError = loadState.status === 'error' ? planErrorPresentation(loadState.error) : null
+  return (
+    <Card className="screening-panel screening-saved-plans" bordered>
+      <div className="screening-panel__heading">
+        <div>
+          <p className="screening-section-kicker">SAVED SCREENER / CRUD</p>
+          <h2>保存与复用</h2>
+          <p className="screening-panel__description">保存条件、从最近方案加载，并在确认后更新当前版本。</p>
+        </div>
+        <div className="screening-plan-toolbar">
+          <button type="button" className="screening-secondary-button" onClick={onRefresh}>刷新最近方案</button>
+          <Button theme="primary" onClick={onOpenCreate} disabled={formMode === 'create'}>保存方案</Button>
+        </div>
+      </div>
+      {currentScreener ? <CurrentPlanSummary screener={currentScreener} dirty={dirty} onUpdate={onOpenUpdate} /> : null}
+      {loadError ? <div className="screening-plan-error" role="alert"><strong>{loadError.title}</strong><span>{loadError.hint}</span>{loadState.status === 'error' && loadState.id !== null ? <button type="button" className="screening-text-button" onClick={onReload}>重新加载当前方案</button> : null}<button type="button" className="screening-text-button" onClick={onClearSelection}>继续编辑临时方案</button></div> : null}
+      {requestState.status === 'success' ? <div className="screening-plan-success" role="status">{requestState.message}</div> : null}
+      {formMode ? <SavedPlanForm mode={formMode} name={formName} description={formDescription} requestState={requestState} onNameChange={onNameChange} onDescriptionChange={onDescriptionChange} onSubmit={onSubmit} onCancel={onCancel} onReload={onReload} /> : null}
+      <div className="screening-plan-list-heading"><h3>最近方案</h3><span>按更新时间排序</span></div>
+      <SavedPlanList state={listState} loadingId={loadState.status === 'loading' ? loadState.id : null} selectedId={selectedId} onRetry={onRefresh} onLoad={onLoad} />
+    </Card>
+  )
+}
+
 function ResultMeta({ data }: { readonly data: ScreenerRunResponse }) {
   return (
     <div className="screening-result-meta" aria-label="执行快照和来源">
@@ -396,18 +647,79 @@ export function ScreeningPage() {
   const [urlIssue, setUrlIssue] = useState<string | null>(null)
   const [runNonce, setRunNonce] = useState(0)
   const [runState, setRunState] = useState<RunState>({ status: 'loading' })
+  const [listNonce, setListNonce] = useState(0)
+  const [loadNonce, setLoadNonce] = useState(0)
+  const [listState, setListState] = useState<PlanListState>({ status: 'loading' })
+  const [loadState, setLoadState] = useState<PlanLoadState>({ status: 'idle' })
+  const [currentScreener, setCurrentScreener] = useState<Screener | null>(null)
+  const [baselineSpec, setBaselineSpec] = useState<ScreenerSpec | null>(null)
+  const [formMode, setFormMode] = useState<PlanFormMode>(null)
+  const [formName, setFormName] = useState('')
+  const [formDescription, setFormDescription] = useState('')
+  const [requestState, setRequestState] = useState<PlanRequestState>({ status: 'idle' })
   const searchString = searchParams.toString()
   const parsedUrl = useMemo(() => readScreeningSpec(searchParams), [searchString, searchParams])
+  const parsedScreenerId = useMemo(() => readScreenerId(searchParams), [searchString, searchParams])
+  const selectedId = parsedScreenerId.id
+  const dirty = currentScreener !== null && !specsEqual(draftSpec, baselineSpec ?? currentScreener.spec)
+
+  const replaceUrlState = (spec: ScreenerSpec, id: number | null) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(screeningQueryKey, serializeScreeningSpec(spec))
+    if (id === null) nextParams.delete(screenerQueryKey)
+    else nextParams.set(screenerQueryKey, String(id))
+    setSearchParams(nextParams, { replace: true })
+  }
 
   useEffect(() => {
     setDraftSpec(parsedUrl.spec)
-    if (parsedUrl.invalidReason !== null) setUrlIssue(parsedUrl.invalidReason)
-  }, [parsedUrl])
+    const issues = [parsedUrl.invalidReason, parsedScreenerId.invalidReason].filter(Boolean)
+    setUrlIssue(issues.length > 0 ? issues.join(' ') : null)
+  }, [parsedScreenerId, parsedUrl])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setListState({ status: 'loading' })
+    listScreeners(1, 20, controller.signal)
+      .then((data) => setListState({ status: 'success', data }))
+      .catch((error: unknown) => {
+        if (!isApiAbortError(error)) setListState({ status: 'error', error })
+      })
+    return () => controller.abort()
+  }, [listNonce])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    if (selectedId === null) {
+      setCurrentScreener(null)
+      setBaselineSpec(null)
+      setLoadState({ status: 'idle' })
+      return () => controller.abort()
+    }
+
+    setCurrentScreener(null)
+    setBaselineSpec(null)
+    setLoadState({ status: 'loading', id: selectedId })
+    getScreener(selectedId, controller.signal)
+      .then((data) => {
+        setCurrentScreener(data)
+        setBaselineSpec(data.spec)
+        setDraftSpec(data.spec)
+        setLoadState({ status: 'success', id: data.id })
+        replaceUrlState(data.spec, data.id)
+        setRunNonce((value) => value + 1)
+      })
+      .catch((error: unknown) => {
+        if (!isApiAbortError(error)) setLoadState({ status: 'error', id: selectedId, error })
+      })
+    return () => controller.abort()
+  }, [loadNonce, parsedScreenerId.invalidReason, selectedId])
 
   const serializedSpec = isScreeningSpecComplete(draftSpec) ? serializeScreeningSpec(draftSpec) : null
   useEffect(() => {
+    if (parsedUrl.invalidReason !== null) return
     if (serializedSpec === null || searchParams.get(screeningQueryKey) === serializedSpec) return
-    const nextParams = new URLSearchParams()
+    const nextParams = new URLSearchParams(searchParams)
     nextParams.set(screeningQueryKey, serializedSpec)
     setSearchParams(nextParams, { replace: true })
   }, [searchParams, serializedSpec, setSearchParams])
@@ -415,6 +727,17 @@ export function ScreeningPage() {
   useEffect(() => {
     const controller = new AbortController()
     let active = true
+    if (urlIssue !== null) {
+      setRunState({ status: 'idle', message: 'URL 状态未通过校验，请修正配置后再运行。' })
+      return () => controller.abort()
+    }
+    if (selectedId !== null && loadState.status !== 'success') {
+      setRunState({
+        status: 'idle',
+        message: loadState.status === 'error' ? '方案未成功加载；请重试或继续编辑临时方案。' : '正在读取保存方案，读取完成后将重新运行。',
+      })
+      return () => controller.abort()
+    }
     if (!isScreeningSpecComplete(draftSpec)) {
       setRunState({ status: 'idle', message: '配置尚不完整，请完成字段值和 Top N。' })
       return () => controller.abort()
@@ -436,13 +759,70 @@ export function ScreeningPage() {
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [draftSpec, runNonce])
+  }, [draftSpec, loadState.status, runNonce, selectedId, urlIssue])
 
   const updateSpec = (nextSpec: ScreenerSpec) => {
     setUrlIssue(null)
     setDraftSpec(nextSpec)
+    if (isScreeningSpecComplete(nextSpec)) {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set(screeningQueryKey, serializeScreeningSpec(nextSpec))
+      setSearchParams(nextParams, { replace: true })
+    }
   }
   const rerun = () => setRunNonce((value) => value + 1)
+
+  const refreshList = () => setListNonce((value) => value + 1)
+  const loadPlan = (id: number) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete(screeningQueryKey)
+    nextParams.set(screenerQueryKey, String(id))
+    setSearchParams(nextParams)
+    setLoadNonce((value) => value + 1)
+  }
+  const reloadCurrentPlan = () => {
+    const id = selectedId ?? currentScreener?.id
+    if (id !== undefined && id !== null) loadPlan(id)
+  }
+  const clearPlanSelection = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete(screenerQueryKey)
+    setSearchParams(nextParams)
+  }
+  const openCreateForm = () => {
+    setFormMode('create')
+    setFormName('')
+    setFormDescription('')
+    setRequestState({ status: 'idle' })
+  }
+  const openUpdateForm = () => {
+    if (!currentScreener) return
+    setFormMode('update')
+    setFormName(currentScreener.name)
+    setFormDescription(currentScreener.description ?? '')
+    setRequestState({ status: 'idle' })
+  }
+  const submitPlan = () => {
+    if (!isScreeningSpecComplete(draftSpec) || formMode === null) return
+    const description = formDescription.trim() === '' ? null : formDescription.trim()
+    setRequestState({ status: 'loading' })
+    const requestPromise = formMode === 'create'
+      ? createScreener({ name: formName, description, spec: draftSpec } satisfies ScreenerCreateRequest)
+      : currentScreener === null
+        ? Promise.reject(new Error('当前没有可更新的保存方案。'))
+        : updateScreener(currentScreener.id, { name: formName, description, spec: draftSpec, version: currentScreener.version } satisfies ScreenerUpdateRequest)
+    requestPromise
+      .then((data) => {
+        setCurrentScreener(data)
+        setBaselineSpec(data.spec)
+        setFormMode(null)
+        setRequestState({ status: 'success', message: formMode === 'create' ? '方案已保存' : '方案已更新' })
+        replaceUrlState(data.spec, data.id)
+        refreshList()
+        if (formMode === 'update') setRunNonce((value) => value + 1)
+      })
+      .catch((error: unknown) => setRequestState({ status: 'error', error }))
+  }
 
   return (
     <main className="page-container screening-page">
@@ -456,6 +836,27 @@ export function ScreeningPage() {
       </section>
 
       {urlIssue ? <div className="screening-url-warning" role="alert">{urlIssue} 未信任的 URL 状态不会发送到后端。</div> : null}
+      <SavedPlansPanel
+        currentScreener={currentScreener}
+        dirty={dirty}
+        listState={listState}
+        loadState={loadState}
+        formMode={formMode}
+        formName={formName}
+        formDescription={formDescription}
+        requestState={requestState}
+        selectedId={selectedId}
+        onRefresh={refreshList}
+        onLoad={loadPlan}
+        onOpenCreate={openCreateForm}
+        onOpenUpdate={openUpdateForm}
+        onNameChange={setFormName}
+        onDescriptionChange={setFormDescription}
+        onSubmit={submitPlan}
+        onCancel={() => setFormMode(null)}
+        onReload={reloadCurrentPlan}
+        onClearSelection={clearPlanSelection}
+      />
       <div className="screening-layout">
         <BuilderPanel spec={draftSpec} runState={runState} onChange={updateSpec} onRun={rerun} />
         <ResultPanel state={runState} onRetry={rerun} />

@@ -3029,6 +3029,198 @@ a {
   padding-top: 48px;
 }
 
+.screening-saved-plans {
+  margin-bottom: 16px;
+}
+
+.screening-panel__description {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.screening-plan-toolbar,
+.screening-current-plan__actions,
+.screening-plan-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.screening-current-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+
+.screening-current-plan > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.screening-current-plan strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.screening-current-plan__meta,
+.screening-plan-list__identity span,
+.screening-plan-list-heading span {
+  color: var(--muted);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.screening-plan-status {
+  color: var(--success);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.screening-plan-status--dirty {
+  color: var(--brand);
+}
+
+.screening-plan-form {
+  margin-top: 20px;
+  padding: 20px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.screening-plan-form__fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.2fr);
+  gap: 12px;
+}
+
+.screening-control textarea {
+  width: 100%;
+  min-height: 40px;
+  resize: vertical;
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.screening-control textarea:hover,
+.screening-control textarea:focus {
+  border-color: var(--muted);
+}
+
+.screening-plan-form__actions {
+  margin-top: 16px;
+}
+
+.screening-plan-form__actions .t-button {
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.screening-plan-error,
+.screening-plan-success,
+.screening-plan-list-message {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.screening-plan-error {
+  color: var(--body);
+  background: rgba(246, 70, 93, 0.08);
+  border: 1px solid rgba(246, 70, 93, 0.35);
+}
+
+.screening-plan-error strong {
+  color: var(--error);
+}
+
+.screening-plan-error span {
+  color: var(--body);
+}
+
+.screening-plan-success {
+  color: var(--success);
+  background: rgba(14, 203, 129, 0.08);
+  border: 1px solid rgba(14, 203, 129, 0.35);
+}
+
+.screening-plan-list-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.screening-plan-list-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.screening-plan-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.screening-plan-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+}
+
+.screening-plan-list__item--selected {
+  border-color: var(--brand);
+}
+
+.screening-plan-list__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.screening-plan-list__identity strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screening-plan-list__identity small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .screening-layout {
   display: grid;
   grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.6fr);
@@ -3388,6 +3580,34 @@ a {
 
   .screening-panel .t-card__body {
     padding: 16px;
+  }
+
+  .screening-panel__heading,
+  .screening-current-plan {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .screening-plan-toolbar,
+  .screening-current-plan__actions,
+  .screening-plan-form__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .screening-plan-toolbar > *,
+  .screening-current-plan__actions > *,
+  .screening-plan-form__actions > * {
+    width: 100%;
+  }
+
+  .screening-plan-form__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .screening-plan-list__item {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .screening-control-grid,
