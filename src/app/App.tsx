@@ -5,6 +5,7 @@ import { MarketOverviewPage } from '../pages/MarketOverviewPage'
 import { StockOverviewPage } from '../pages/StockOverviewPage'
 import { ScreeningPage } from '../pages/ScreeningPage'
 import { StockPoolDetailPage, StockPoolsPage } from '../pages/StockPoolsPage'
+import { ResearchPage } from '../pages/ResearchPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
 
 export function App() {
@@ -19,7 +20,7 @@ export function App() {
           <Route path="/research/stock-pools" element={<StockPoolsPage />} />
           <Route path="/research/stock-pools/:id" element={<StockPoolDetailPage />} />
           <Route path="/watchlist" element={<WorkspacePage workspace="自选" />} />
-          <Route path="/research" element={<WorkspacePage workspace="研究" />} />
+          <Route path="/research" element={<ResearchPage />} />
           <Route path="/strategy" element={<WorkspacePage workspace="策略" />} />
           <Route path="/backtest" element={<WorkspacePage workspace="回测" />} />
           <Route path="/data" element={<WorkspacePage workspace="数据" />} />
