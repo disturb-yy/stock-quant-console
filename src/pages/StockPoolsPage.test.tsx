@@ -7,11 +7,11 @@ import {
   addStockPoolMember,
   createStockPool,
   deleteStockPoolMember,
-  getStockPool,
+  getStockPoolSummary,
   listStockPoolMembers,
   listStockPools,
 } from '../api/stockPools'
-import type { StockPool, StockPoolListResponse, StockPoolMemberListResponse } from '../api/types'
+import type { StockPool, StockPoolListResponse, StockPoolMemberListResponse, StockPoolSummary } from '../api/types'
 import { StockPoolDetailPage, StockPoolsPage } from './StockPoolsPage'
 
 vi.mock('../api/stockPools', async () => {
@@ -21,7 +21,7 @@ vi.mock('../api/stockPools', async () => {
     addStockPoolMember: vi.fn(),
     createStockPool: vi.fn(),
     deleteStockPoolMember: vi.fn(),
-    getStockPool: vi.fn(),
+    getStockPoolSummary: vi.fn(),
     listStockPoolMembers: vi.fn(),
     listStockPools: vi.fn(),
   }
@@ -40,6 +40,19 @@ const pool: StockPool = {
 const listResponse: StockPoolListResponse = {
   data: [pool],
   pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 },
+}
+
+const poolSummary: StockPoolSummary = {
+  id: 7,
+  name: '红利观察',
+  description: '仅供长期观察。',
+  source: { type: 'manual', reference: 'fnd-003-demo-v8-stock-pool', created_at: '2026-09-18T05:00:00Z' },
+  member_count: 0,
+  created_at: '2026-09-18T05:00:00Z',
+  updated_at: '2026-09-18T05:00:00Z',
+  industry: { availability: 'empty', distribution: null, as_of: null, provenance: null, unavailable_reason: '股票池无成员' },
+  pe: { availability: 'empty', value: null, sample_size: 0, as_of: null, basis: null, provenance: null, unavailable_reason: '股票池无成员' },
+  roe: { availability: 'empty', value: null, sample_size: 0, as_of: null, basis: null, provenance: null, unavailable_reason: '股票池无成员' },
 }
 
 const memberListResponse: StockPoolMemberListResponse = {
@@ -77,7 +90,7 @@ function renderDetail(path = '/research/stock-pools/7') {
 const createStockPoolMock = vi.mocked(createStockPool)
 const addStockPoolMemberMock = vi.mocked(addStockPoolMember)
 const deleteStockPoolMemberMock = vi.mocked(deleteStockPoolMember)
-const getStockPoolMock = vi.mocked(getStockPool)
+const getStockPoolSummaryMock = vi.mocked(getStockPoolSummary)
 const listStockPoolMembersMock = vi.mocked(listStockPoolMembers)
 const listStockPoolsMock = vi.mocked(listStockPools)
 
@@ -86,7 +99,7 @@ describe('StockPoolsPage', () => {
     vi.clearAllMocks()
     listStockPoolsMock.mockResolvedValue(listResponse)
     createStockPoolMock.mockResolvedValue(pool)
-    getStockPoolMock.mockResolvedValue(pool)
+    getStockPoolSummaryMock.mockResolvedValue(poolSummary)
     listStockPoolMembersMock.mockResolvedValue(memberListResponse)
     addStockPoolMemberMock.mockResolvedValue({ member: { symbol: '000001.SZ', name: '平安银行' }, member_count: 1 })
     deleteStockPoolMemberMock.mockResolvedValue({ symbol: '000001.SZ', member_count: 0 })
@@ -141,7 +154,7 @@ describe('StockPoolsPage', () => {
 describe('StockPoolDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    getStockPoolMock.mockResolvedValue(pool)
+    getStockPoolSummaryMock.mockResolvedValue(poolSummary)
     listStockPoolMembersMock.mockResolvedValue(memberListResponse)
     addStockPoolMemberMock.mockResolvedValue({ member: { symbol: '000001.SZ', name: '平安银行' }, member_count: 1 })
     deleteStockPoolMemberMock.mockResolvedValue({ symbol: '000001.SZ', member_count: 0 })
@@ -155,8 +168,58 @@ describe('StockPoolDetailPage', () => {
     expect(screen.getAllByText('手工创建')).toHaveLength(2)
     expect(screen.getByText('0', { selector: 'dd' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '刷新详情' }))
-    await waitFor(() => expect(getStockPoolMock).toHaveBeenCalledTimes(2))
-    expect(getStockPoolMock).toHaveBeenLastCalledWith(7, expect.any(AbortSignal))
+    await waitFor(() => expect(getStockPoolSummaryMock).toHaveBeenCalledTimes(2))
+    expect(getStockPoolSummaryMock).toHaveBeenLastCalledWith(7, expect.any(AbortSignal))
+  })
+
+  it('shows source trace and keeps an empty profile explicit', async () => {
+    renderDetail()
+
+    expect(await screen.findByText('fnd-003-demo-v8-stock-pool')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '基础画像' })).toBeInTheDocument()
+    expect(screen.getAllByText('空 Pool')).toHaveLength(3)
+    expect(screen.getAllByText('股票池无成员')).toHaveLength(3)
+    expect(screen.queryByText('0%')).not.toBeInTheDocument()
+  })
+
+  it('shows available industry and PE while keeping an unavailable ROE distinct', async () => {
+    getStockPoolSummaryMock.mockResolvedValue({
+      ...poolSummary,
+      member_count: 2,
+      industry: {
+        availability: 'available',
+        distribution: [{ code: 'BK semiconductor', name: '半导体', member_count: 2 }],
+        as_of: '2026-09-18',
+        provenance: 'sector_memberships',
+        unavailable_reason: null,
+      },
+      pe: {
+        availability: 'available',
+        value: '8.50',
+        sample_size: 2,
+        as_of: '2026-09-18',
+        basis: 'pe_ttm',
+        provenance: 'financial_metrics',
+        unavailable_reason: null,
+      },
+      roe: {
+        availability: 'unavailable',
+        value: null,
+        sample_size: 0,
+        as_of: null,
+        basis: null,
+        provenance: null,
+        unavailable_reason: '财务指标依赖不可用',
+      },
+    })
+
+    renderDetail()
+
+    expect(await screen.findByText('半导体')).toBeInTheDocument()
+    expect(screen.getByText('8.50')).toBeInTheDocument()
+    expect(screen.getByText('财务指标依赖不可用')).toBeInTheDocument()
+    expect(document.querySelectorAll('.stock-pool-summary-evidence')).toHaveLength(3)
+    expect(document.querySelector('.stock-pool-summary-evidence')).toHaveTextContent('2026-09-18')
   })
 
   it('reads members from the server and opens Stock Detail with the raw symbol', async () => {
@@ -180,7 +243,7 @@ describe('StockPoolDetailPage', () => {
 
     await waitFor(() => expect(addStockPoolMemberMock).toHaveBeenCalledWith(7, { symbol: '000001.SZ' }))
     expect(await screen.findByRole('status')).toHaveTextContent('已添加 000001.SZ')
-    await waitFor(() => expect(getStockPoolMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(getStockPoolSummaryMock).toHaveBeenCalledTimes(2))
     expect(listStockPoolMembersMock).toHaveBeenCalledTimes(2)
   })
 
@@ -232,11 +295,11 @@ describe('StockPoolDetailPage', () => {
   })
 
   it('shows not found or dependency errors without substituting list data', async () => {
-    getStockPoolMock.mockRejectedValue(new ApiError('backend', '后端返回统一 API 错误', { status: 404, payload: { code: 'NOT_FOUND', message: '股票池不存在' } }))
+    getStockPoolSummaryMock.mockRejectedValue(new ApiError('backend', '后端返回统一 API 错误', { status: 404, payload: { code: 'NOT_FOUND', message: '股票池不存在' } }))
     renderDetail('/research/stock-pools/999')
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('股票池详情暂不可用')
+    expect(alert).toHaveTextContent('股票池不存在')
     expect(alert).toHaveTextContent('NOT_FOUND')
     expect(screen.queryByRole('heading', { name: '红利观察' })).not.toBeInTheDocument()
   })

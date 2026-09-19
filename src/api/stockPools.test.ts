@@ -5,6 +5,7 @@ import {
   createStockPool,
   deleteStockPoolMember,
   getStockPool,
+  getStockPoolSummary,
   listStockPoolMembers,
   listStockPools,
 } from './stockPools'
@@ -28,6 +29,19 @@ const member = { symbol: '000001.SZ', name: '平安银行' }
 const memberListResponse = {
   data: [member],
   pagination: { page: 2, page_size: 10, total: 11, total_pages: 2 },
+}
+
+const summary = {
+  id: 7,
+  name: '红利观察',
+  description: '仅供长期观察。',
+  source: { type: 'manual' as const, reference: 'fnd-003-demo-v8-stock-pool', created_at: '2026-09-18T05:00:00Z' },
+  member_count: 0,
+  created_at: '2026-09-18T05:00:00Z',
+  updated_at: '2026-09-18T05:00:00Z',
+  industry: { availability: 'empty' as const, distribution: null, as_of: null, provenance: null, unavailable_reason: '股票池无成员' },
+  pe: { availability: 'empty' as const, value: null, sample_size: 0, as_of: null, basis: null, provenance: null, unavailable_reason: '股票池无成员' },
+  roe: { availability: 'empty' as const, value: null, sample_size: 0, as_of: null, basis: null, provenance: null, unavailable_reason: '股票池无成员' },
 }
 
 describe('stock pool API', () => {
@@ -58,6 +72,20 @@ describe('stock pool API', () => {
     await getStockPool(7)
 
     expect(fetchSpy.mock.calls[0][0]).toBe('/api/v1/stock-pools/7')
+  })
+
+  it('reads the summary snapshot through the approved endpoint', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(summary), { status: 200 }))
+
+    await expect(getStockPoolSummary(7)).resolves.toEqual(summary)
+
+    expect(fetchSpy.mock.calls[0][0]).toBe('/api/v1/stock-pools/7/summary')
+  })
+
+  it('rejects summary payloads that replace nullable profile values with invalid data', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ...summary, pe: { ...summary.pe, sample_size: '0' } }), { status: 200 }))
+
+    await expect(getStockPoolSummary(7)).rejects.toMatchObject<Partial<ApiError>>({ kind: 'invalid-payload' })
   })
 
   it('does not turn an invalid success payload into a pool', async () => {

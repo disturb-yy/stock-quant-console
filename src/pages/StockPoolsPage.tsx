@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Button } from 'tdesign-react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
-import { describeApiError, formatBackendApiError, isApiAbortError } from '../api/client'
+import { describeApiError, formatBackendApiError, isApiAbortError, isApiError, isApiErrorResponse } from '../api/client'
 import {
   addStockPoolMember,
   createStockPool,
   deleteStockPoolMember,
-  getStockPool,
+  getStockPoolSummary,
   listStockPoolMembers,
   listStockPools,
 } from '../api/stockPools'
@@ -17,6 +17,8 @@ import type {
   StockPoolListResponse,
   StockPoolMember,
   StockPoolMemberListResponse,
+  StockPoolMetricSummary,
+  StockPoolSummary,
 } from '../api/types'
 import { ErrorState, EmptyState, LoadingState } from '../components/PageState'
 
@@ -34,7 +36,7 @@ type CreateState =
 
 type DetailState =
   | { readonly status: 'loading' }
-  | { readonly status: 'success'; readonly data: StockPool }
+  | { readonly status: 'success'; readonly data: StockPoolSummary }
   | { readonly status: 'error'; readonly error: unknown }
 
 type MemberListState =
@@ -72,9 +74,22 @@ function sourceLabel(source: StockPool['source']) {
   return source === 'manual' ? '手工创建' : source
 }
 
+function summarySourceLabel(source: StockPoolSummary['source']['type']) {
+  return source === 'manual' ? '手工创建' : 'Screener 生成'
+}
+
 function createErrorMessage(error: unknown) {
   const display = describeApiError(error, formatBackendApiError)
   return `${display.message} · ${display.diagnostic}`
+}
+
+function detailErrorPresentation(error: unknown) {
+  if (isApiError(error)) {
+    const code = isApiErrorResponse(error.payload) ? error.payload.code : undefined
+    if (error.status === 404 || code === 'NOT_FOUND') return { title: '股票池不存在', hint: '请从股票池列表重新打开服务端存在的 Pool。' }
+    if (error.status === 503 || code === 'DEPENDENCY_UNAVAILABLE') return { title: '股票池摘要暂不可用', hint: '没有使用详情或列表的替代数据，请检查服务后重试。' }
+  }
+  return { title: '股票池摘要暂不可用', hint: '没有使用详情或列表的替代数据，请检查服务后重试。' }
 }
 
 function StockPoolCreatePanel({ onCreated, onCancel }: { readonly onCreated: (pool: StockPool) => void; readonly onCancel: () => void }) {
@@ -283,7 +298,7 @@ export function StockPoolDetailPage() {
     }
     const controller = new AbortController()
     setState({ status: 'loading' })
-    getStockPool(parsedId, controller.signal)
+    getStockPoolSummary(parsedId, controller.signal)
       .then((data) => setState({ status: 'success', data }))
       .catch((error) => { if (!isApiAbortError(error)) setState({ status: 'error', error }) })
     return () => controller.abort()
@@ -291,14 +306,21 @@ export function StockPoolDetailPage() {
 
   useEffect(() => load(), [load])
 
+  const errorPresentation = state.status === 'error' ? detailErrorPresentation(state.error) : null
+
   return (
     <main className="page-container stock-pool-detail-page">
       <Link className="stock-pool-back-link" to={returnPath}>← 返回股票池列表</Link>
       {state.status === 'loading' ? <LoadingState label="正在请求股票池详情" /> : null}
-      {state.status === 'error' ? <ErrorState error={state.error} title="股票池详情暂不可用" hint="详情不会使用名称、成员数或本地列表替代服务端 ID。" actionLabel="重新加载" onRetry={load} /> : null}
+      {state.status === 'error' && errorPresentation ? <ErrorState error={state.error} title={errorPresentation.title} hint={errorPresentation.hint} actionLabel="重新加载" onRetry={load} /> : null}
       {state.status === 'success' ? <StockPoolDetail data={state.data} onRefresh={load} /> : null}
     </main>
   )
+}
+
+function formatSummaryDate(value: string | null) {
+  if (value === null) return '未提供'
+  return value
 }
 
 function StockPoolMemberPagination({ data, onPageChange }: { readonly data: StockPoolMemberListResponse; readonly onPageChange: (page: number) => void }) {
@@ -382,7 +404,7 @@ function StockPoolBatchResult({ state }: { readonly state: BatchState }) {
   )
 }
 
-function StockPoolMembersPanel({ data, onRefresh }: { readonly data: StockPool; readonly onRefresh: () => void }) {
+function StockPoolMembersPanel({ data, onRefresh }: { readonly data: Pick<StockPoolSummary, 'id'>; readonly onRefresh: () => void }) {
   const [memberPage, setMemberPage] = useState(1)
   const [memberRefreshToken, setMemberRefreshToken] = useState(0)
   const [state, setState] = useState<MemberListState>({ status: 'loading' })
@@ -518,7 +540,55 @@ function StockPoolMembersPanel({ data, onRefresh }: { readonly data: StockPool; 
   )
 }
 
-function StockPoolDetail({ data, onRefresh }: { readonly data: StockPool; readonly onRefresh: () => void }) {
+function summaryAvailabilityLabel(value: StockPoolMetricSummary['availability']) {
+  if (value === 'available') return '可用'
+  if (value === 'empty') return '空 Pool'
+  return '暂不可用'
+}
+
+function SummaryEvidence({ asOf, provenance, basis }: { readonly asOf: string | null; readonly provenance: string | null; readonly basis?: string | null }) {
+  return (
+    <p className="stock-pool-summary-evidence">
+      数据日期：{formatSummaryDate(asOf)} · 来源：{provenance ?? '未提供'}{basis ? ` · 口径：${basis}` : ''}
+    </p>
+  )
+}
+
+function StockPoolIndustrySummaryPanel({ data }: { readonly data: StockPoolSummary['industry'] }) {
+  const distribution = data.distribution ?? []
+  const hasDistribution = data.availability === 'available' && distribution.length > 0
+  return (
+    <section className="stock-pool-summary-card" aria-labelledby="stock-pool-industry-heading">
+      <div className="stock-pool-summary-card-heading"><h3 id="stock-pool-industry-heading">行业分布</h3><span className={`stock-pool-summary-status stock-pool-summary-status--${data.availability}`}>{summaryAvailabilityLabel(data.availability)}</span></div>
+      {hasDistribution ? <ul className="stock-pool-industry-list">{distribution.map((item) => <li key={item.code}><span>{item.name}</span><strong>{item.member_count} 名成员</strong></li>)}</ul> : <p className="stock-pool-summary-empty">{data.unavailable_reason ?? (data.availability === 'available' ? '服务端未提供行业分布。' : '当前没有可展示的行业分布。')}</p>}
+      <SummaryEvidence asOf={data.as_of} provenance={data.provenance} />
+    </section>
+  )
+}
+
+function StockPoolMetricSummaryPanel({ label, data }: { readonly label: string; readonly data: StockPoolMetricSummary }) {
+  const hasValue = data.availability === 'available' && data.value !== null
+  return (
+    <section className="stock-pool-summary-card" aria-label={`${label}摘要`}>
+      <div className="stock-pool-summary-card-heading"><h3>{label}</h3><span className={`stock-pool-summary-status stock-pool-summary-status--${data.availability}`}>{summaryAvailabilityLabel(data.availability)}</span></div>
+      <p className={`stock-pool-summary-value${hasValue ? '' : ' stock-pool-summary-value--missing'}`}>{hasValue ? data.value : (data.unavailable_reason ?? '服务端未提供可用值。')}</p>
+      {hasValue ? <p className="stock-pool-summary-sample">样本数：{data.sample_size}</p> : null}
+      <SummaryEvidence asOf={data.as_of} provenance={data.provenance} basis={data.basis} />
+    </section>
+  )
+}
+
+function StockPoolProfilePanel({ data }: { readonly data: StockPoolSummary }) {
+  return (
+    <section className="stock-pool-profile-panel" aria-labelledby="stock-pool-profile-heading">
+      <div className="stock-pools-panel-heading"><div><p className="stock-pools-section-kicker">PROFILE / SERVER SUMMARY</p><h2 id="stock-pool-profile-heading">基础画像</h2></div><span className="stock-pools-source">按 summary 快照</span></div>
+      <p className="stock-pools-panel-description">行业、PE 和 ROE 只展示服务端声明为可用的真实摘要；空值与依赖故障保留原始语义。</p>
+      <div className="stock-pool-summary-grid"><StockPoolIndustrySummaryPanel data={data.industry} /><StockPoolMetricSummaryPanel label="PE" data={data.pe} /><StockPoolMetricSummaryPanel label="ROE" data={data.roe} /></div>
+    </section>
+  )
+}
+
+function StockPoolDetail({ data, onRefresh }: { readonly data: StockPoolSummary; readonly onRefresh: () => void }) {
   return (
     <>
       <section className="stock-pool-detail-heading">
@@ -526,16 +596,19 @@ function StockPoolDetail({ data, onRefresh }: { readonly data: StockPool; readon
         <Button variant="outline" onClick={onRefresh}>刷新详情</Button>
       </section>
       <section className="stock-pool-detail-panel" aria-labelledby="stock-pool-detail-meta-heading">
-        <div className="stock-pools-panel-heading"><div><p className="stock-pools-section-kicker">SERVER METADATA</p><h2 id="stock-pool-detail-meta-heading">服务端元数据</h2></div><span className="stock-pools-source">{sourceLabel(data.source)}</span></div>
+        <div className="stock-pools-panel-heading"><div><p className="stock-pools-section-kicker">SERVER METADATA</p><h2 id="stock-pool-detail-meta-heading">服务端元数据</h2></div><span className="stock-pools-source">{summarySourceLabel(data.source.type)}</span></div>
         <dl className="stock-pool-detail-meta">
           <div><dt>名称</dt><dd>{data.name}</dd></div>
           <div><dt>描述</dt><dd>{data.description || '未填写描述'}</dd></div>
-          <div><dt>来源</dt><dd>{sourceLabel(data.source)}</dd></div>
+          <div><dt>来源</dt><dd>{summarySourceLabel(data.source.type)}</dd></div>
+          <div><dt>来源引用</dt><dd>{data.source.reference ?? '未提供（手工股票池）'}</dd></div>
+          <div><dt>来源创建时间</dt><dd>{formatPoolTime(data.source.created_at)}</dd></div>
           <div><dt>成员数</dt><dd>{data.member_count}</dd></div>
           <div><dt>更新时间</dt><dd>{formatPoolTime(data.updated_at)}</dd></div>
           <div><dt>创建时间</dt><dd>{formatPoolTime(data.created_at)}</dd></div>
         </dl>
       </section>
+      <StockPoolProfilePanel data={data} />
       <StockPoolMembersPanel data={data} onRefresh={onRefresh} />
     </>
   )

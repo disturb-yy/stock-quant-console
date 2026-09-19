@@ -4041,6 +4041,132 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+.stock-pool-profile-panel {
+  min-width: 0;
+  margin-top: 16px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.stock-pool-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(0, 0.875fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.stock-pool-summary-card {
+  min-width: 0;
+  padding: 16px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+
+.stock-pool-summary-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stock-pool-summary-card h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stock-pool-summary-status {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.stock-pool-summary-status--available {
+  color: var(--success);
+}
+
+.stock-pool-summary-status--unavailable {
+  color: var(--error);
+}
+
+.stock-pool-industry-list {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stock-pool-industry-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--body);
+  font-size: 13px;
+}
+
+.stock-pool-industry-list li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.stock-pool-industry-list strong,
+.stock-pool-summary-value,
+.stock-pool-summary-sample {
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-pool-industry-list strong {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.stock-pool-summary-value {
+  margin: 24px 0 0;
+  color: var(--brand);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.stock-pool-summary-value--missing {
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.stock-pool-summary-sample,
+.stock-pool-summary-evidence,
+.stock-pool-summary-empty {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.stock-pool-summary-sample {
+  margin: 8px 0 0;
+}
+
+.stock-pool-summary-evidence {
+  margin: 20px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.stock-pool-summary-empty {
+  min-height: 42px;
+  margin: 20px 0 0;
+}
+
 .stock-pool-members-panel {
   min-width: 0;
   margin-top: 16px;
@@ -4335,6 +4461,14 @@ a {
   }
 
   .stock-pool-detail-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-pool-profile-panel {
+    padding: 16px;
+  }
+
+  .stock-pool-summary-grid {
     grid-template-columns: 1fr;
   }
 
