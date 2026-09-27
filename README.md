@@ -5,6 +5,7 @@
 ## 当前能力
 
 - 在 `/` 提供 A 股数据同步页面，支持同步目标、日期范围、任务状态、详情和失败重试。
+- 在 `/sync-schedules` 提供每日同步计划管理，支持创建、编辑、启停、删除，并展示下一次执行与最近结果。
 - API 模块支持真实相对路径请求；开发/测试可显式使用 `VITE_STOCK_DATA_API_MODE=mock` 验证页面状态。Mock 不会在真实 API 失败后自动启用。
 - 开发服务器将 `/api` 代理到后端地址。
 
@@ -18,6 +19,8 @@ src/
 ├── app/App.tsx
 ├── api/health.ts
 ├── api/syncTasks.ts
+├── api/syncSchedules.ts
+├── app/SyncSchedulePage.tsx
 ├── styles.css
 └── test/setup.ts
 ```
