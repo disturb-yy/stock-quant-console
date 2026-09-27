@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  getSyncApiMode,
   SyncApiError,
   syncTasksApi,
   type SyncTask,
   type SyncTaskSummary,
   type SyncTarget,
 } from '../api/syncTasks'
+import { useRuntimeConfig } from './RuntimeConfigContext'
+import { AppShell } from './AppShell'
+import { OverviewPage } from './OverviewPage'
+import { StockCatalogPage } from './StockCatalogPage'
+import { StockDataPage } from './StockDataPage'
+import { SyncSchedulePage } from './SyncSchedulePage'
+import { PageHeader } from '../components/ui/PageHeader'
+import { PaginationBar } from '../components/ui/PaginationBar'
 
 const PAGE_SIZE = 10
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 const targetLabels: Record<SyncTarget, string> = {
   basic_info: '股票基础资料',
@@ -124,27 +132,28 @@ type TaskListProps = {
 }
 
 function TaskList(props: TaskListProps) {
-  if (props.loading) return <p className="state-message">正在加载同步任务…</p>
-  if (props.items.length === 0) return <p className="state-message">暂无同步任务，请先选择目标并开始同步。</p>
+  if (props.items.length === 0) return <p className="state-message">{props.loading ? '正在加载同步任务…' : '暂无同步任务，请先选择目标并开始同步。'}</p>
   return (
     <div className="task-table-wrap">
-      <table className="task-table">
+      <table aria-busy={props.loading} className="data-table task-table">
         <caption className="sr-only">当前任务与最近历史</caption>
         <thead><tr><th>目标</th><th>状态</th><th>来源</th><th>更新时间</th><th>操作</th></tr></thead>
         <tbody>
-          {props.items.map((task) => (
+          {props.loading ? <tr><td colSpan={5}><span className="table-loading-state" role="status">正在更新同步任务…</span></td></tr> : props.items.map((task) => (
             <tr className={props.selectedId === task.task_id ? 'is-selected' : ''} key={task.task_id}>
               <td data-label="目标">{targetLabels[task.target]}</td>
               <td data-label="状态"><span className={`status status-${task.status}`}>{statusLabels[task.status]}</span></td>
               <td data-label="来源">{sourceLabel(task.source)}</td>
               <td data-label="更新时间">{formatTimestamp(task.updated_at)}</td>
-              <td data-label="操作" className="row-actions">
-                <button className="text-button" onClick={() => props.onView(task.task_id)} type="button">查看</button>
-                {task.status === 'failed' && (
-                  <button className="text-button danger-action" disabled={props.retryingId === task.task_id} onClick={() => props.onRetry(task.task_id)} type="button">
-                    {props.retryingId === task.task_id ? '重试中…' : '重试'}
-                  </button>
-                )}
+              <td data-label="操作">
+                <div className="task-actions">
+                  <button className="text-button" onClick={() => props.onView(task.task_id)} type="button">查看</button>
+                  {task.status === 'failed' && (
+                    <button className="text-button danger-action" disabled={props.retryingId === task.task_id} onClick={() => props.onRetry(task.task_id)} type="button">
+                      {props.retryingId === task.task_id ? '重试中…' : '重试'}
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -190,7 +199,7 @@ function LatestResult({ task }: { task: SyncTaskSummary | null }) {
   )
 }
 
-export function App() {
+function SyncWorkspace() {
   const [target, setTarget] = useState<SyncTarget>('basic_info')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -204,13 +213,13 @@ export function App() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string>()
   const [retryingId, setRetryingId] = useState<string | null>(null)
-  const mode = getSyncApiMode()
+  const { config } = useRuntimeConfig()
 
-  const loadTasks = useCallback(async (page: number) => {
+  const loadTasks = useCallback(async (page: number, pageSize = PAGE_SIZE) => {
     setListLoading(true)
     setListError(undefined)
     try {
-      const response = await syncTasksApi.listTasks(page, PAGE_SIZE)
+      const response = await syncTasksApi.listTasks(page, pageSize)
       setItems(response.items)
       setPagination(response.pagination)
     } catch (error) {
@@ -238,24 +247,44 @@ export function App() {
     try {
       const task = await syncTasksApi.createTask({ target, ...(target !== 'basic_info' ? { start_date: startDate, end_date: endDate } : {}) })
       setSelectedTask(task)
-      await loadTasks(pagination.page)
+      await loadTasks(pagination.page, pagination.page_size)
     } catch (error) { setFormError(errorMessage(error)) } finally { setSubmitting(false) }
   }
 
   const retry = async (taskId: string) => {
     setRetryingId(taskId)
     setFormError(undefined)
-    try { const result = await syncTasksApi.retryTask(taskId); await loadTasks(pagination.page); await viewTask(result.task_id) } catch (error) { setFormError(errorMessage(error)) } finally { setRetryingId(null) }
+    try { const result = await syncTasksApi.retryTask(taskId); await loadTasks(pagination.page, pagination.page_size); await viewTask(result.task_id) } catch (error) { setFormError(errorMessage(error)) } finally { setRetryingId(null) }
   }
 
   return (
-    <main className="app-shell">
-      <header className="page-header"><div><p className="eyebrow">A-SHARE RESEARCH DATA</p><h1>A 股数据同步</h1><p>批量同步基础资料与历史日线，完成后追踪任务状态和数据来源。</p></div>{mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>}</header>
+      <main className="app-shell">
+      <PageHeader aside={config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>} description="批量同步基础资料与历史日线，完成后追踪任务状态和数据来源。" eyebrow="A-SHARE RESEARCH DATA" title="A 股数据同步" />
       <SyncForm target={target} startDate={startDate} endDate={endDate} submitting={submitting} error={formError} onTargetChange={(value) => { setTarget(value); if (value === 'basic_info') { setStartDate(''); setEndDate('') } }} onStartDateChange={setStartDate} onEndDateChange={setEndDate} onSubmit={() => void submit()} />
-      {listError && <div className="error-banner" role="alert"><span>{listError}</span><button className="text-button" onClick={() => void loadTasks(pagination.page)} type="button">重新加载</button></div>}
-      <section className="panel tasks-panel" aria-labelledby="tasks-title"><div className="section-heading"><div><p className="eyebrow">TASK MONITOR</p><h2 id="tasks-title">当前任务与最近历史</h2></div><span className="muted-text">共 {pagination.total} 条</span></div><TaskList items={items} loading={listLoading} retryingId={retryingId} selectedId={selectedTask?.task_id ?? null} onView={(taskId) => void viewTask(taskId)} onRetry={(taskId) => void retry(taskId)} /><div className="pagination"><button disabled={pagination.page <= 1 || listLoading} onClick={() => void loadTasks(pagination.page - 1)} type="button">上一页</button><span>第 {pagination.page} 页</span><button disabled={pagination.page * pagination.page_size >= pagination.total || listLoading} onClick={() => void loadTasks(pagination.page + 1)} type="button">下一页</button></div></section>
+      {listError && <div className="error-banner" role="alert"><span>{listError}</span><button className="text-button" onClick={() => void loadTasks(pagination.page, pagination.page_size)} type="button">重新加载</button></div>}
+      <section className="panel tasks-panel" aria-labelledby="tasks-title"><div className="section-heading"><div><p className="eyebrow">TASK MONITOR</p><h2 id="tasks-title">当前任务与最近历史</h2></div></div><TaskList items={items} loading={listLoading} retryingId={retryingId} selectedId={selectedTask?.task_id ?? null} onView={(taskId) => void viewTask(taskId)} onRetry={(taskId) => void retry(taskId)} />{items.length > 0 && <PaginationBar loading={listLoading} onPageChange={(page) => void loadTasks(page, pagination.page_size)} onPageSizeChange={(pageSize) => void loadTasks(1, pageSize)} page={pagination.page} pageSize={pagination.page_size} pageSizeOptions={PAGE_SIZE_OPTIONS} total={pagination.total} />}</section>
       <TaskDetail task={selectedTask} loading={detailLoading} error={detailError} />
       <LatestResult task={latestTask} />
     </main>
   )
+}
+
+function stockDataSymbolFromPath(): string | null {
+  const match = window.location.pathname.match(/^\/stocks\/([^/]+)\/data$/)
+  if (!match) return null
+  try { return decodeURIComponent(match[1]) } catch { return match[1] }
+}
+
+export function App() {
+  const symbol = stockDataSymbolFromPath()
+  const page = symbol !== null
+    ? <StockDataPage symbol={symbol} />
+    : window.location.pathname === '/overview'
+    ? <OverviewPage />
+      : window.location.pathname === '/stocks'
+        ? <StockCatalogPage />
+        : window.location.pathname === '/sync-schedules'
+          ? <SyncSchedulePage />
+        : <SyncWorkspace />
+  return <AppShell>{page}</AppShell>
 }

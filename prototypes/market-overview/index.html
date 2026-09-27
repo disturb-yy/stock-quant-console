@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="量策股票研究终端布局原型" />
+    <title>量策 · 股票研究终端原型</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --canvas: #0b0e11;
+        --canvas-raised: #11161b;
+        --surface: #1e2329;
+        --surface-raised: #2b3139;
+        --brand: #fcd535;
+        --brand-active: #f0b90b;
+        --text: #f5f5f5;
+        --body: #eaecef;
+        --muted: #929aa5;
+        --line: #2b3139;
+        --line-soft: #20262d;
+        --market-up: #f6465d;
+        --market-down: #0ecb81;
+        --status-info: #3b82f6;
+        --status-success: #2f855a;
+        --status-warning: #b7791f;
+        --status-error: #c53030;
+        --shadow: 0 18px 60px rgba(0, 0, 0, 0.2);
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+        font-synthesis: none;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { background: var(--canvas); }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        color: var(--body);
+        background: var(--canvas);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      button,
+      input,
+      select { font: inherit; }
+
+      button { color: inherit; cursor: pointer; }
+
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+      }
+
+      .app-shell { min-height: 100vh; padding-bottom: 44px; }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        min-height: 64px;
+        gap: 28px;
+        padding: 0 28px;
+        background: var(--canvas);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        flex: 0 0 auto;
+        color: var(--text);
+        text-decoration: none;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        color: var(--canvas);
+        background: var(--brand);
+        border-radius: 7px;
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      .brand-caption {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+      }
+
+      .global-nav,
+      .header-actions,
+      .page-tabs,
+      .tab-actions,
+      .button-row,
+      .chart-toolbar,
+      .table-tools,
+      .watchlist-tabs {
+        display: flex;
+        align-items: center;
+      }
+
+      .global-nav { align-self: stretch; gap: 4px; }
+
+      .global-nav button,
+      .page-tab,
+      .text-button,
+      .icon-button,
+      .watchlist-tabs button,
+      .chart-toolbar button,
+      .table-tools button,
+      .market-mode button {
+        border: 0;
+        background: transparent;
+      }
+
+      .global-nav button {
+        position: relative;
+        min-width: 64px;
+        padding: 0 14px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .global-nav button::after {
+        position: absolute;
+        right: 14px;
+        bottom: 0;
+        left: 14px;
+        height: 2px;
+        background: transparent;
+        content: "";
+      }
+
+      .global-nav button:hover,
+      .global-nav button.active,
+      .page-tab.active,
+      .chart-toolbar button.active,
+      .watchlist-tabs button.active,
+      .market-mode button.active { color: var(--brand); }
+
+      .global-nav button.active::after { background: var(--brand); }
+
+      .header-actions { gap: 12px; margin-left: auto; }
+
+      .icon-button {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        color: var(--muted);
+        border-radius: var(--radius-sm);
+      }
+
+      .icon-button:hover { color: var(--text); background: var(--surface); }
+
+      .avatar {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        color: #11161b;
+        background: #c9d1d9;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .change { font-family: SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
+      .up { color: var(--market-up); }
+      .down { color: var(--market-down); }
+
+      .page-tabs {
+        gap: 4px;
+        min-height: 52px;
+        padding: 0 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .current-section {
+        flex: 0 0 auto;
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .section-divider {
+        flex: 0 0 auto;
+        margin: 0 8px 1px 4px;
+        color: var(--line);
+        font-size: 18px;
+      }
+
+      .page-tab {
+        position: relative;
+        align-self: stretch;
+        padding: 0 16px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .page-tab::after {
+        position: absolute;
+        right: 16px;
+        bottom: 0;
+        left: 16px;
+        height: 2px;
+        background: transparent;
+        content: "";
+      }
+
+      .page-tab.active::after { background: var(--brand); }
+
+      .tab-actions { gap: 16px; margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+      .live-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-right: 6px;
+        background: var(--market-down);
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(14, 203, 129, 0.12);
+      }
+
+      .main { width: min(1440px, calc(100% - 56px)); margin: 0 auto; }
+
+      .page-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 34px 0 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 6px;
+        color: var(--brand);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+      }
+
+      h1,
+      h2,
+      h3,
+      p { margin: 0; }
+
+      h1 { color: var(--text); font-size: clamp(25px, 3vw, 34px); line-height: 1.25; }
+
+      .page-description { max-width: 620px; margin-top: 7px; color: var(--muted); }
+
+      .head-tools { display: flex; align-items: center; gap: 10px; }
+
+      .search-control {
+        display: flex;
+        align-items: center;
+        width: 248px;
+        height: 40px;
+        gap: 8px;
+        padding: 0 12px;
+        color: var(--muted);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+      }
+
+      .search-control input {
+        width: 100%;
+        color: var(--body);
+        background: transparent;
+        border: 0;
+        outline: 0;
+      }
+
+      .primary-button,
+      .secondary-button {
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: var(--radius-sm);
+        font-weight: 700;
+        transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+      }
+
+      .primary-button { color: var(--canvas); background: var(--brand); border: 1px solid var(--brand); }
+      .primary-button:hover { background: var(--brand-active); border-color: var(--brand-active); }
+      .secondary-button { color: var(--body); background: var(--surface); border: 1px solid var(--line); }
+      .secondary-button:hover { color: var(--text); border-color: #4a535e; }
+
+      .market-overview {
+        display: grid;
+        grid-template-columns: minmax(230px, 1.05fr) repeat(4, minmax(150px, 1fr));
+        overflow: hidden;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+      }
+
+      .market-intro,
+      .index-card { min-height: 124px; padding: 18px 20px; }
+      .market-intro { border-right: 1px solid var(--line); }
+      .market-intro-title { color: var(--text); font-size: 16px; font-weight: 700; }
+      .market-intro-meta { margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+      .market-mode { display: flex; gap: 16px; margin-top: 16px; }
+      .market-mode button { padding: 0; color: var(--muted); font-size: 12px; }
+      .market-mode button.active { font-weight: 700; }
+
+      .index-card { border-right: 1px solid var(--line); }
+      .index-card:last-child { border-right: 0; }
+      .index-name { color: var(--muted); font-size: 12px; }
+      .index-value { margin-top: 8px; color: var(--text); font-family: SFMono-Regular, Consolas, monospace; font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .index-change { margin-top: 2px; font-family: SFMono-Regular, Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+      .index-bar { height: 3px; margin-top: 14px; background: var(--line-soft); border-radius: 3px; overflow: hidden; }
+      .index-bar span { display: block; height: 100%; border-radius: inherit; }
+      .index-bar .bar-up { background: var(--market-up); }
+      .index-bar .bar-down { background: var(--market-down); }
+
+      .workspace-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 60px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title { color: var(--text); font-size: 16px; font-weight: 700; }
+      .panel-caption { margin-top: 2px; color: var(--muted); font-size: 11px; }
+
+      .chart-panel { min-width: 0; }
+
+      .quote-summary {
+        display: flex;
+        align-items: flex-end;
+        gap: 20px;
+        padding: 18px 20px 10px;
+      }
+
+      .quote-name { display: flex; align-items: baseline; gap: 8px; }
+      .quote-name strong { color: var(--text); font-size: 20px; }
+      .quote-name span { color: var(--muted); font-size: 12px; }
+      .quote-price { margin-top: 3px; color: var(--text); font-family: SFMono-Regular, Consolas, monospace; font-size: 29px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .quote-change { padding-bottom: 5px; font-family: SFMono-Regular, Consolas, monospace; font-size: 13px; font-variant-numeric: tabular-nums; }
+      .quote-meta { display: flex; flex-wrap: wrap; gap: 16px; margin-left: auto; color: var(--muted); font-size: 11px; text-align: right; }
+      .quote-meta strong { display: block; margin-top: 2px; color: var(--body); font-family: SFMono-Regular, Consolas, monospace; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+      .chart-toolbar { gap: 2px; padding: 0 20px; border-bottom: 1px solid var(--line-soft); }
+      .chart-toolbar button { min-width: 42px; padding: 9px 9px; color: var(--muted); font-size: 12px; }
+      .chart-toolbar button.active { font-weight: 700; }
+
+      .chart-wrap { position: relative; height: 285px; padding: 14px 20px 12px; }
+      .chart-svg { width: 100%; height: 100%; overflow: visible; }
+      .chart-grid-line { stroke: #2a3037; stroke-width: 1; stroke-dasharray: 2 5; }
+      .chart-axis { fill: var(--muted); font-family: SFMono-Regular, Consolas, monospace; font-size: 10px; }
+      .chart-area { fill: rgba(252, 213, 53, 0.06); }
+      .chart-line { fill: none; stroke: var(--brand); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+      .chart-point { fill: var(--brand); stroke: var(--surface); stroke-width: 3; }
+      .chart-marker { stroke: var(--brand); stroke-width: 1; stroke-dasharray: 3 4; }
+      .chart-tooltip { fill: var(--surface-raised); stroke: var(--line); stroke-width: 1; }
+      .chart-tooltip-text { fill: var(--body); font-family: SFMono-Regular, Consolas, monospace; font-size: 10px; }
+
+      .chart-footer { display: flex; align-items: center; justify-content: space-between; padding: 0 20px 18px; color: var(--muted); font-size: 11px; }
+      .legend { display: inline-flex; align-items: center; gap: 6px; }
+      .legend-mark { width: 12px; height: 2px; background: var(--brand); }
+
+      .watchlist-panel { min-width: 0; }
+      .watchlist-tabs { gap: 18px; padding: 0 20px; border-bottom: 1px solid var(--line-soft); }
+      .watchlist-tabs button { padding: 12px 0; color: var(--muted); font-size: 12px; }
+      .watchlist-tabs button.active { color: var(--text); font-weight: 700; }
+
+      .watchlist-list { padding: 6px 0; }
+      .watchlist-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 12px 20px;
+        text-align: left;
+        border: 0;
+        border-bottom: 1px solid var(--line-soft);
+        background: transparent;
+      }
+
+      .watchlist-row:last-child { border-bottom: 0; }
+      .watchlist-row:hover,
+      .watchlist-row.selected { background: var(--surface-raised); }
+      .watchlist-primary { min-width: 0; }
+      .watchlist-symbol { color: var(--text); font-family: SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: 700; }
+      .watchlist-name { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+      .watchlist-price { color: var(--body); font-family: SFMono-Regular, Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+      .watchlist-change { min-width: 61px; text-align: right; font-family: SFMono-Regular, Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+
+      .watchlist-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 17px; border-top: 1px solid var(--line); }
+      .watchlist-footer span { color: var(--muted); font-size: 11px; }
+      .text-button { padding: 0; color: var(--brand); font-size: 12px; font-weight: 600; }
+
+      .lower-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .table-tools { gap: 4px; }
+      .table-tools button { padding: 7px 9px; color: var(--muted); font-size: 12px; border-radius: var(--radius-sm); }
+      .table-tools button.active,
+      .table-tools button:hover { color: var(--brand); background: var(--surface-raised); }
+
+      .table-scroll { overflow-x: auto; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; }
+      th,
+      td { padding: 13px 20px; border-bottom: 1px solid var(--line-soft); text-align: left; white-space: nowrap; }
+      th { color: var(--muted); font-size: 11px; font-weight: 600; }
+      td { color: var(--body); font-family: SFMono-Regular, Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+      td:nth-child(2) { font-family: inherit; }
+      tbody tr { transition: background 160ms ease; }
+      tbody tr:hover { background: var(--surface-raised); }
+      .stock-cell { display: flex; align-items: center; gap: 10px; }
+      .rank { color: var(--muted); }
+      .stock-code { color: var(--text); font-family: SFMono-Regular, Consolas, monospace; font-weight: 700; }
+      .stock-name { color: var(--muted); font-family: inherit; }
+      .row-action { padding: 0; color: var(--brand); border: 0; background: transparent; font-size: 12px; }
+
+      .empty-row { display: none; padding: 42px 20px; color: var(--muted); text-align: center; font-size: 13px; }
+      .empty-row.visible { display: block; }
+
+      .insight-content { padding: 18px 20px 20px; }
+      .insight-block { padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
+      .insight-block:first-child { padding-top: 0; }
+      .insight-block:last-child { padding-bottom: 0; border-bottom: 0; }
+      .insight-label { color: var(--muted); font-size: 11px; }
+      .insight-value { margin-top: 5px; color: var(--text); font-size: 17px; font-weight: 700; }
+      .insight-value span { color: var(--muted); font-size: 12px; font-weight: 400; }
+      .insight-note { margin-top: 4px; color: var(--muted); font-size: 11px; }
+      .progress { height: 5px; margin-top: 11px; background: var(--line-soft); border-radius: 4px; overflow: hidden; }
+      .progress span { display: block; width: 72%; height: 100%; background: var(--brand); border-radius: inherit; }
+      .shortcut { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; color: var(--body); border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; text-align: left; }
+      .shortcut:last-child { border-bottom: 0; }
+      .shortcut:hover { color: var(--brand); }
+      .shortcut small { color: var(--muted); }
+
+      .provenance { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+      .provenance::before { width: 6px; height: 6px; background: var(--status-warning); border-radius: 50%; content: ""; }
+
+      .prototype-bar {
+        position: fixed;
+        right: 18px;
+        bottom: 16px;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px 8px 12px;
+        color: var(--body);
+        background: #161b20;
+        border: 1px solid #3b424b;
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        font-size: 11px;
+      }
+
+      .prototype-bar strong { color: var(--brand); font-size: 10px; letter-spacing: 0.08em; }
+      .prototype-bar select { padding: 4px 24px 4px 7px; color: var(--body); background: var(--surface-raised); border: 1px solid var(--line); border-radius: 4px; font-size: 11px; }
+
+      .state-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        background: rgba(11, 14, 17, 0.74);
+      }
+
+      .state-card { width: min(390px, 100%); padding: 26px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow); text-align: center; }
+      .state-card h2 { color: var(--text); font-size: 18px; }
+      .state-card p { margin-top: 8px; color: var(--muted); font-size: 13px; }
+      .state-spinner { width: 28px; height: 28px; margin: 0 auto 14px; border: 2px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin 800ms linear infinite; }
+      .state-icon { display: grid; width: 34px; height: 34px; margin: 0 auto 14px; place-items: center; color: var(--brand); background: rgba(252, 213, 53, 0.12); border-radius: 50%; font-weight: 800; }
+      .state-card.error .state-icon { color: var(--market-up); background: rgba(246, 70, 93, 0.12); }
+      body[data-state="loading"] .state-layer,
+      body[data-state="empty"] .state-layer,
+      body[data-state="error"] .state-layer { display: grid; }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      @media (max-width: 1180px) {
+        .market-overview { grid-template-columns: minmax(220px, 1.15fr) repeat(4, minmax(135px, 1fr)); }
+        .main { width: min(100% - 40px, 1440px); }
+        .topbar,
+        .page-tabs { padding-right: 20px; padding-left: 20px; }
+      }
+
+      @media (max-width: 960px) {
+        .topbar { gap: 16px; }
+        .brand-caption { display: none; }
+        .global-nav button { min-width: 52px; padding: 0 9px; }
+        .global-nav button::after { right: 9px; left: 9px; }
+        .market-overview { grid-template-columns: repeat(4, 1fr); }
+        .market-intro { grid-column: 1 / -1; min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+        .index-card:nth-child(5) { border-right: 0; }
+        .workspace-grid,
+        .lower-grid { grid-template-columns: minmax(0, 1fr); }
+      }
+
+      @media (max-width: 720px) {
+        .topbar { position: static; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; }
+        .global-nav { order: 3; width: 100%; min-height: 38px; overflow-x: auto; }
+        .global-nav button { min-height: 38px; }
+        .header-actions { gap: 4px; }
+        .page-tabs { padding-right: 12px; padding-left: 12px; overflow-x: auto; }
+        .page-tab { flex: 0 0 auto; }
+        .tab-actions { margin-left: 8px; }
+        .main { width: min(100% - 24px, 1440px); }
+        .page-head { align-items: stretch; flex-direction: column; padding-top: 26px; }
+        .head-tools { flex-wrap: wrap; }
+        .search-control { flex: 1 1 190px; width: auto; }
+        .market-overview { grid-template-columns: repeat(2, 1fr); }
+        .index-card { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .index-card:nth-child(odd) { border-right: 0; }
+        .index-card:nth-last-child(-n + 2) { border-bottom: 0; }
+        .quote-summary { flex-wrap: wrap; gap: 6px 16px; }
+        .quote-meta { width: 100%; margin-left: 0; text-align: left; }
+        .chart-wrap { height: 235px; padding-right: 10px; padding-left: 10px; }
+        .chart-footer { align-items: flex-start; flex-direction: column; gap: 6px; }
+        .prototype-bar { right: 12px; bottom: 12px; left: 12px; justify-content: space-between; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body data-state="normal">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#overview" aria-label="量策首页">
+          <span class="brand-mark">量</span>
+          <span>量策 <span class="brand-caption">QUANT LAB</span></span>
+        </a>
+
+        <nav class="global-nav" aria-label="一级导航">
+          <button class="active" type="button">市场</button>
+          <button type="button">研究</button>
+          <button type="button">数据</button>
+          <button type="button">回测</button>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-button" type="button" aria-label="通知">◌</button>
+          <span class="avatar" aria-label="演示用户">研</span>
+        </div>
+      </header>
+
+      <nav class="page-tabs" aria-label="工作台页面">
+        <span class="current-section">市场</span>
+        <span class="section-divider" aria-hidden="true">|</span>
+        <button class="page-tab active" type="button" data-page="overview">概览</button>
+        <button class="page-tab" type="button" data-page="stocks">股票</button>
+        <button class="page-tab" type="button" data-page="sync">任务</button>
+        <div class="tab-actions"><span><i class="live-dot"></i>演示数据</span><span>更新时间 09:31:06</span></div>
+      </nav>
+
+      <main class="main">
+        <section class="page-head">
+          <div>
+            <p class="eyebrow">MARKET OVERVIEW / A 股研究视图</p>
+            <h1>今日市场</h1>
+            <p class="page-description">把市场状态、重点标的与研究入口放在同一张工作台上，先看全局，再进入数据复核。</p>
+          </div>
+          <div class="head-tools">
+            <label class="search-control" aria-label="搜索股票目录">
+              <span aria-hidden="true">⌕</span>
+              <input id="stockSearch" type="search" placeholder="搜索名称或代码" />
+            </label>
+            <button class="primary-button" type="button" id="addWatchlist">＋ 添加自选</button>
+          </div>
+        </section>
+
+        <section class="market-overview" aria-label="市场主要指数">
+          <div class="market-intro">
+            <div class="market-intro-title">市场脉搏</div>
+            <div class="market-intro-meta">上涨家数 2,746 · 下跌家数 1,821 · 平盘 542</div>
+            <div class="market-mode" role="tablist" aria-label="市场视图切换">
+              <button class="active" type="button">沪深市场</button>
+              <button type="button">行业表现</button>
+            </div>
+          </div>
+          <div class="index-card"><div class="index-name">上证指数</div><div class="index-value">3,381.19</div><div class="index-change up">+14.02　+0.42%</div><div class="index-bar"><span class="bar-up" style="width: 61%"></span></div></div>
+          <div class="index-card"><div class="index-name">深证成指</div><div class="index-value">10,720.83</div><div class="index-change up">+72.46　+0.68%</div><div class="index-bar"><span class="bar-up" style="width: 73%"></span></div></div>
+          <div class="index-card"><div class="index-name">创业板指</div><div class="index-value">2,193.16</div><div class="index-change down">-3.96　-0.18%</div><div class="index-bar"><span class="bar-down" style="width: 24%"></span></div></div>
+          <div class="index-card"><div class="index-name">北证 50</div><div class="index-value">1,100.31</div><div class="index-change up">+2.71　+0.25%</div><div class="index-bar"><span class="bar-up" style="width: 43%"></span></div></div>
+        </section>
+
+        <section class="workspace-grid" aria-label="行情工作区">
+          <article class="panel chart-panel">
+            <header class="panel-header">
+              <div><h2 class="panel-title">股票行情</h2><p class="panel-caption">从观察列表选择标的，查看近期走势</p></div>
+              <button class="icon-button" type="button" aria-label="更多行情设置">•••</button>
+            </header>
+            <div class="quote-summary">
+              <div>
+                <div class="quote-name"><strong id="quoteName">贵州茅台</strong><span id="quoteSymbol">600519 · 沪市</span></div>
+                <div class="quote-price" id="quotePrice">1,482.60</div>
+              </div>
+              <div class="quote-change up" id="quoteChange">+18.60　+1.27%</div>
+              <div class="quote-meta">
+                <span>今开<strong id="quoteOpen">1,465.00</strong></span>
+                <span>最高<strong id="quoteHigh">1,489.90</strong></span>
+                <span>成交额<strong id="quoteAmount">28.4 亿</strong></span>
+              </div>
+            </div>
+            <div class="chart-toolbar" role="tablist" aria-label="行情周期">
+              <button class="active" type="button">分时</button><button type="button">日线</button><button type="button">周线</button><button type="button">月线</button><button type="button">年线</button>
+            </div>
+            <div class="chart-wrap">
+              <svg class="chart-svg" viewBox="0 0 760 250" role="img" aria-label="贵州茅台价格走势演示图">
+                <line class="chart-grid-line" x1="0" y1="34" x2="760" y2="34"></line>
+                <line class="chart-grid-line" x1="0" y1="88" x2="760" y2="88"></line>
+                <line class="chart-grid-line" x1="0" y1="142" x2="760" y2="142"></line>
+                <line class="chart-grid-line" x1="0" y1="196" x2="760" y2="196"></line>
+                <path class="chart-area" d="M0 188 L36 178 L72 184 L108 150 L144 164 L180 130 L216 142 L252 108 L288 124 L324 92 L360 104 L396 84 L432 96 L468 68 L504 74 L540 52 L576 62 L612 45 L648 56 L684 35 L720 46 L760 26 L760 220 L0 220 Z"></path>
+                <path class="chart-line" d="M0 188 L36 178 L72 184 L108 150 L144 164 L180 130 L216 142 L252 108 L288 124 L324 92 L360 104 L396 84 L432 96 L468 68 L504 74 L540 52 L576 62 L612 45 L648 56 L684 35 L720 46 L760 26"></path>
+                <line class="chart-marker" x1="684" y1="20" x2="684" y2="220"></line>
+                <circle class="chart-point" cx="684" cy="35" r="4"></circle>
+                <rect class="chart-tooltip" x="596" y="4" width="112" height="28" rx="4"></rect>
+                <text class="chart-tooltip-text" x="607" y="22">09:30　1,482.60</text>
+                <text class="chart-axis" x="0" y="244">09:30</text><text class="chart-axis" x="182" y="244">10:30</text><text class="chart-axis" x="365" y="244">11:30</text><text class="chart-axis" x="548" y="244">13:30</text><text class="chart-axis" x="720" y="244">14:30</text>
+              </svg>
+            </div>
+            <footer class="chart-footer"><span class="legend"><i class="legend-mark"></i>价格走势</span><span>数据范围：2026-09-26　来源：演示数据</span></footer>
+          </article>
+
+          <aside class="panel watchlist-panel">
+            <header class="panel-header"><div><h2 class="panel-title">自选观察</h2><p class="panel-caption">快速切换重点标的</p></div><button class="icon-button" type="button" aria-label="编辑自选">✎</button></header>
+            <div class="watchlist-tabs"><button class="active" type="button">自选</button><button type="button">最近浏览</button></div>
+            <div class="watchlist-list" id="watchlistList"></div>
+            <footer class="watchlist-footer"><span>共 6 个标的</span><button class="text-button" type="button">管理自选 →</button></footer>
+          </aside>
+        </section>
+
+        <section class="lower-grid" aria-label="热门股票与研究入口">
+          <article class="panel table-panel">
+            <header class="panel-header"><div><h2 class="panel-title">热门股票</h2><p class="panel-caption">按当前交易日的涨跌与成交额排序</p></div><div class="table-tools"><button class="active" type="button">涨幅榜</button><button type="button">跌幅榜</button><button type="button">成交额</button></div></header>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>#</th><th>标的</th><th>最新价</th><th>涨跌幅</th><th>成交额</th><th>数据</th></tr></thead>
+                <tbody id="stockRows"></tbody>
+              </table>
+              <div class="empty-row" id="emptyRow">没有找到匹配的股票，请更换名称或代码。</div>
+            </div>
+          </article>
+
+          <aside class="panel insight-panel">
+            <header class="panel-header"><div><h2 class="panel-title">研究入口</h2><p class="panel-caption">从市场观察进入数据工作流</p></div><span class="provenance">演示数据</span></header>
+            <div class="insight-content">
+              <div class="insight-block"><div class="insight-label">已同步股票</div><div class="insight-value">4,892 <span>只</span></div><div class="progress"><span></span></div><div class="insight-note">基础资料覆盖率 72%</div></div>
+              <div class="insight-block"><div class="insight-label">最近一次数据同步</div><div class="insight-value">08:30 <span>今日</span></div><div class="insight-note">历史日线 · 成功 · 数据截至 09-25</div></div>
+              <div class="insight-block"><button class="shortcut" type="button"><span>进入股票目录</span><small>→</small></button><button class="shortcut" type="button"><span>查看同步任务</span><small>→</small></button><button class="shortcut" type="button"><span>打开研究工作区</span><small>→</small></button></div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div class="prototype-bar" aria-label="原型状态控制">
+      <strong>LAYOUT PROTOTYPE</strong>
+      <span>预览状态</span>
+      <select id="previewState" aria-label="选择原型预览状态"><option value="normal">正常</option><option value="loading">加载中</option><option value="empty">空结果</option><option value="error">请求失败</option></select>
+    </div>
+
+    <div class="state-layer" aria-live="polite">
+      <div class="state-card" id="stateCard">
+        <div class="state-spinner" id="stateSpinner"></div>
+        <div class="state-icon" id="stateIcon">!</div>
+        <h2 id="stateTitle">正在加载市场数据</h2>
+        <p id="stateText">正在读取当前市场概览，请稍候。</p>
+      </div>
+    </div>
+
+    <script>
+      const stocks = [
+        { rank: 1, symbol: "688981", name: "中芯国际", price: "92.36", change: "+8.42%", amount: "42.6 亿", direction: "up" },
+        { rank: 2, symbol: "300750", name: "宁德时代", price: "214.80", change: "+6.18%", amount: "38.2 亿", direction: "up" },
+        { rank: 3, symbol: "600519", name: "贵州茅台", price: "1,482.60", change: "+1.27%", amount: "28.4 亿", direction: "up" },
+        { rank: 4, symbol: "601318", name: "中国平安", price: "48.76", change: "-1.34%", amount: "21.8 亿", direction: "down" },
+        { rank: 5, symbol: "000858", name: "五粮液", price: "142.18", change: "-0.86%", amount: "18.9 亿", direction: "down" }
+      ];
+
+      const watchlist = [
+        { symbol: "600519", name: "贵州茅台", price: "1,482.60", change: "+1.27%", direction: "up", open: "1,465.00", high: "1,489.90", amount: "28.4 亿" },
+        { symbol: "300750", name: "宁德时代", price: "214.80", change: "+6.18%", direction: "up", open: "202.06", high: "216.40", amount: "38.2 亿" },
+        { symbol: "601318", name: "中国平安", price: "48.76", change: "-1.34%", direction: "down", open: "49.38", high: "49.60", amount: "21.8 亿" },
+        { symbol: "000858", name: "五粮液", price: "142.18", change: "-0.86%", direction: "down", open: "143.20", high: "144.06", amount: "18.9 亿" },
+        { symbol: "688981", name: "中芯国际", price: "92.36", change: "+8.42%", direction: "up", open: "85.12", high: "94.20", amount: "42.6 亿" },
+        { symbol: "601012", name: "隆基绿能", price: "18.44", change: "+2.27%", direction: "up", open: "18.04", high: "18.68", amount: "12.6 亿" }
+      ];
+
+      const qs = (selector) => document.querySelector(selector);
+      const watchlistList = qs("#watchlistList");
+      const stockRows = qs("#stockRows");
+      const emptyRow = qs("#emptyRow");
+
+      function renderWatchlist() {
+        watchlistList.innerHTML = watchlist.map((stock, index) => `
+          <button class="watchlist-row${index === 0 ? " selected" : ""}" type="button" data-symbol="${stock.symbol}">
+            <span class="watchlist-primary"><span class="watchlist-symbol">${stock.symbol}</span><span class="watchlist-name">${stock.name}</span></span>
+            <span class="watchlist-price">${stock.price}</span>
+            <span class="watchlist-change ${stock.direction}">${stock.change}</span>
+          </button>
+        `).join("");
+        watchlistList.querySelectorAll(".watchlist-row").forEach((row) => row.addEventListener("click", () => selectStock(row.dataset.symbol)));
+      }
+
+      function renderStocks(query = "") {
+        const normalizedQuery = query.trim().toLowerCase();
+        const filtered = stocks.filter((stock) => `${stock.symbol} ${stock.name}`.toLowerCase().includes(normalizedQuery));
+        stockRows.innerHTML = filtered.map((stock) => `
+          <tr>
+            <td class="rank">${stock.rank}</td>
+            <td><span class="stock-cell"><span><span class="stock-code">${stock.symbol}</span><span class="stock-name"> ${stock.name}</span></span></span></td>
+            <td>${stock.price}</td><td class="${stock.direction}">${stock.change}</td><td>${stock.amount}</td>
+            <td><button class="row-action" type="button" data-symbol="${stock.symbol}">查看</button></td>
+          </tr>
+        `).join("");
+        emptyRow.classList.toggle("visible", filtered.length === 0);
+        stockRows.querySelectorAll(".row-action").forEach((button) => button.addEventListener("click", () => selectStock(button.dataset.symbol)));
+      }
+
+      function selectStock(symbol) {
+        const stock = watchlist.find((item) => item.symbol === symbol) || stocks.find((item) => item.symbol === symbol);
+        if (!stock) return;
+        qs("#quoteName").textContent = stock.name;
+        qs("#quoteSymbol").textContent = `${stock.symbol} · A 股`;
+        qs("#quotePrice").textContent = stock.price;
+        qs("#quoteChange").textContent = stock.change;
+        qs("#quoteChange").className = `quote-change ${stock.direction}`;
+        qs("#quoteOpen").textContent = stock.open || "—";
+        qs("#quoteHigh").textContent = stock.high || "—";
+        qs("#quoteAmount").textContent = stock.amount;
+        watchlistList.querySelectorAll(".watchlist-row").forEach((row) => row.classList.toggle("selected", row.dataset.symbol === symbol));
+      }
+
+      document.querySelectorAll(".page-tab").forEach((tab) => tab.addEventListener("click", () => {
+        document.querySelectorAll(".page-tab").forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+      }));
+
+      document.querySelectorAll(".chart-toolbar button, .table-tools button, .watchlist-tabs button, .market-mode button").forEach((button) => button.addEventListener("click", () => {
+        button.parentElement.querySelectorAll("button").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+      }));
+
+      qs("#stockSearch").addEventListener("input", (event) => renderStocks(event.target.value));
+      qs("#addWatchlist").addEventListener("click", (event) => {
+        event.currentTarget.textContent = "✓ 已添加";
+        setTimeout(() => { event.currentTarget.textContent = "＋ 添加自选"; }, 1200);
+      });
+
+      const stateCopy = {
+        normal: ["", "", ""],
+        loading: ["正在加载市场数据", "正在读取当前市场概览，请稍候。", "loading"],
+        empty: ["暂无可用数据", "当前筛选范围没有匹配的市场数据，请调整条件后重试。", "empty"],
+        error: ["市场数据加载失败", "服务暂时不可用，请稍后重试；本原型不会自动切换为本地数据。", "error"]
+      };
+      qs("#previewState").addEventListener("change", (event) => {
+        const [title, text, cardClass] = stateCopy[event.target.value];
+        document.body.dataset.state = event.target.value;
+        qs("#stateTitle").textContent = title;
+        qs("#stateText").textContent = text;
+        qs("#stateCard").className = `state-card ${cardClass}`;
+        qs("#stateSpinner").style.display = event.target.value === "loading" ? "block" : "none";
+        qs("#stateIcon").style.display = event.target.value === "loading" ? "none" : "grid";
+      });
+
+      renderWatchlist();
+      renderStocks();
+    </script>
+  </body>
+</html>
