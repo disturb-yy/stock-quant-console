@@ -10,7 +10,7 @@ description: 量策研究工作台的视觉样式基础、数据阅读规则与�
 
 本文是 `/home/jadon/coding/stock-quant-console` 的视觉样式基础。它定义量化研究工作台的默认视觉方向、信息层级、布局节奏、金融数据语义和基础组件规则。
 
-本文描述的是实现目标，不代表当前仓库已经实现全部页面或组件。当前代码仍是 React、TypeScript、Vite、TDesign 的基础启动壳层；新增页面必须以真实产品设计、后端接口契约和验收标准为前置条件。
+本文描述量策研究工作台的实现基准，并同步记录当前已落地的应用外壳。新增页面仍必须以真实产品设计、后端接口契约和验收标准为前置条件。
 
 ## 产品与用户
 
@@ -135,6 +135,29 @@ AppShell
 - 选中页签使用 `brand` 文字与 2px 底部指示线；未选中页签使用 `muted`，并保留可见键盘焦点。
 - 窄屏保持横向可滚动的页签栏，不把核心页面切换收进 hover 或不可见菜单。
 
+### 当前 V1 工作台排布
+
+当前工作台采用两层导航，入口和顺序固定，不从页面文件名自动生成：
+
+```text
+量策 QUANT LAB
+└── 一级导航：市场
+    └── 工作台页签：概览 | 股票 | 任务 | 计划
+```
+
+| 页签 | 路由 | 激活范围 |
+|---|---|---|
+| 概览 | `/overview` | 概览页 |
+| 股票 | `/stocks` | 股票目录和 `/stocks/{symbol}/data` 股票详情 |
+| 任务 | `/` | A 股数据同步任务页 |
+| 计划 | `/sync-schedules` | 同步计划管理页 |
+
+- 顶部栏包含品牌、一级导航和右侧辅助操作；页签栏紧随顶部栏，使用全宽横向排布。
+- 页签栏中的“市场”是当前一级分区标识，不是额外页面入口；核心二级入口按“概览、股票、任务、计划”固定排列。
+- 当前项同时使用品牌色文字和底部 2px 指示线，并通过 `aria-current="page"` 表达当前页；股票详情沿用“股票”页签，不创建重复入口。
+- 顶部栏默认 64px、页签栏默认 52px；宽屏内边距为 28px，中等宽度收缩为 20px，窄屏页签栏保留横向滚动。
+- 窄屏顶部栏允许换行，不能隐藏或收起“股票、任务、计划”等核心入口；页签右侧的上下文说明在窄屏隐藏，不影响页面切换。
+
 ## 基础组件规则
 
 ### 按钮
@@ -241,23 +264,23 @@ AppShell
 当前代码已经具备：
 
 - [main.tsx](/home/jadon/coding/stock-quant-console/src/main.tsx) 中的 React、TDesign `ConfigProvider` 和全局 TDesign 样式入口；
-- [App.tsx](/home/jadon/coding/stock-quant-console/src/app/App.tsx) 中的 `Card`、`Space`、`Typography`、`Alert` 和 `Button` 基础组合；
-- [styles.css](/home/jadon/coding/stock-quant-console/src/styles.css) 中的全局字体、背景、最小宽度和基础居中布局；
+- [AppShell.tsx](/home/jadon/coding/stock-quant-console/src/app/AppShell.tsx) 中的两层导航、页签激活规则、路由入口和运行配置提示；
+- [App.tsx](/home/jadon/coding/stock-quant-console/src/app/App.tsx) 及 `src/pages/` 中的概览、同步任务、计划、股票目录和股票详情页面组合；
+- [styles.css](/home/jadon/coding/stock-quant-console/src/styles.css) 中的工作台顶栏、页签栏、内容宽度、响应式排布和焦点样式；
 - [health.ts](/home/jadon/coding/stock-quant-console/src/api/health.ts) 中的相对路径请求、响应校验、Loading、Error 和重试状态。
 
-当前尚未实现：
+当前仍需按页面逐项补齐或独立验证：
 
-- 正式的应用外壳、导航和路由；
 - 设计 Token 的集中定义和 TDesign 主题覆盖；
-- 业务页面、真实业务 API、表格和图表组件；
-- 页面级 Loading、Empty、Permission、Unavailable 状态；
-- 视觉回归或浏览器级 UI 验收。
+- 各业务页面的完整 Loading、Empty、Permission、Unavailable 状态覆盖；
+- 当前导航间距修复后的浏览器级视觉回归证据。
 
-因此，新增页面时应先将本文件的语义 Token 映射为代码，再实现页面和组件；不能只在单个页面中临时写一套颜色、字号和圆角。
+因此，新增页面时应先将本文件的语义 Token、统一外壳和路由映射作为约束，再实现页面和组件；不能只在单个页面中临时写一套导航、颜色、字号和圆角。
 
 ## UI 交付检查
 
 - 页面目标、路由、字段、操作和数据契约已确认；
+- 页面使用统一工作台外壳，且页签名称、顺序、路由和激活范围与本文件一致；
 - 使用本文件定义的语义 Token 和字体角色；
 - 主次操作、数据层级和页面密度清晰；
 - Loading、Empty、Error、Disabled、Permission 或 Unavailable 状态已覆盖适用范围；
@@ -273,3 +296,4 @@ AppShell
 - 2026-09-25：参考既有 Stock Quant Console 设计文档，建立当前 `~/coding` 前端的自包含视觉基础。
 - 2026-09-25：将外部金融平台研究逻辑转换为量策的中文系统字体、A 股红涨绿跌语义和真实数据边界；不复制外部专有资产。
 - 2026-09-25：明确当前启动壳层只是基础联通页面，正式业务页面需在产品设计、API 契约和验收确认后实现。
+- 2026-09-27：同步 EPIC-001 两层工作台导航规格，固定“市场”一级导航及“概览、股票、任务、计划”二级页签、路由映射和窄屏排布；股票详情沿用“股票”页签。
