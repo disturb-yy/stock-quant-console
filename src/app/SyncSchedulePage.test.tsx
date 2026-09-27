@@ -70,6 +70,9 @@ describe('SyncSchedulePage', () => {
     render(<SyncSchedulePage />)
 
     await screen.findAllByText('股票基础资料')
+    const actionCell = screen.getByRole('cell', { name: /编辑 停用 删除/ })
+    expect(actionCell).not.toHaveClass('row-actions')
+    expect(actionCell.querySelector('.schedule-actions')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '停用' }))
 
     await waitFor(() => expect(update).toHaveBeenCalledWith('schedule-1', { enabled: false }))

@@ -80,6 +80,7 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
 .schedule-table th:last-child, .schedule-table td:last-child { padding-right: 0; }
 .schedule-table td strong, .schedule-table td small { display: block; }
 .schedule-table td small { margin-top: 5px; color: #929aa5; font-size: 12px; }
+.schedule-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .schedule-status-enabled::before { background: #2f855a; }
 .schedule-status-disabled::before { background: #929aa5; }
 @media (min-width: 761px) {
@@ -89,7 +90,7 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
   .schedule-table th:nth-child(3), .schedule-table td:nth-child(3) { width: 15%; }
   .schedule-table th:nth-child(4), .schedule-table td:nth-child(4) { width: 24%; }
   .schedule-table th:nth-child(5), .schedule-table td:nth-child(5) { width: 18%; }
-  .schedule-table .row-actions { flex-wrap: nowrap; white-space: nowrap; }
+  .schedule-table .schedule-actions { flex-wrap: nowrap; white-space: nowrap; }
 }
 .schedule-drawer { position: fixed; z-index: 10; top: 0; right: 0; display: flex; width: min(100%, 440px); min-height: 100vh; flex-direction: column; padding: 32px; border-left: 1px solid #2b3139; background: #171b20; box-shadow: -12px 0 32px rgb(0 0 0 / 25%); }
 .drawer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -244,8 +245,7 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
   .schedule-table tr { border-bottom: 1px solid #2b3139; padding: 12px 0; }
   .schedule-table td, .schedule-table th, .schedule-table td:first-child, .schedule-table td:last-child { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border: 0; padding: 6px 0; text-align: right; }
   .schedule-table td::before { color: #929aa5; content: attr(data-label); font-size: 12px; text-align: left; }
-  .schedule-table .row-actions { justify-content: flex-end; }
-  .schedule-table .row-actions::before { margin-right: auto; }
+  .schedule-table .schedule-actions { justify-content: flex-end; }
   .schedule-drawer { width: 100%; padding: 24px; }
 }
 
