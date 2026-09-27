@@ -6,7 +6,7 @@
 | --- | --- |
 | `src/main.tsx` | 挂载 React、TDesign `ConfigProvider` 与根应用。 |
 | `src/app/App.tsx` | 按当前路由组合研究概览、A 股数据同步页面与已同步股票目录页面。 |
-| `src/app/AppShell.tsx` | 提供顶部一级导航、`市场 | 概览 股票 任务` 工作台页签和当前页面选中状态。 |
+| `src/app/AppShell.tsx` | 提供顶部一级导航、`市场 | 概览 股票 任务 计划` 工作台页签和当前页面选中状态。 |
 | `src/app/OverviewPage.tsx` | 读取股票目录与同步任务真实接口，渲染研究概览、数据不可用状态和最近同步任务。 |
 | `src/app/OverviewPage.test.tsx` | 覆盖研究概览成功加载、真实摘要展示、接口失败和重试状态。 |
 | `src/app/RuntimeConfigContext.tsx` | 在应用外壳中读取运行时能力，向页面提供数据源模式。 |

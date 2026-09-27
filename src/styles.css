@@ -82,6 +82,15 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
 .schedule-table td small { margin-top: 5px; color: #929aa5; font-size: 12px; }
 .schedule-status-enabled::before { background: #2f855a; }
 .schedule-status-disabled::before { background: #929aa5; }
+@media (min-width: 761px) {
+  .schedule-table { min-width: 720px; table-layout: fixed; }
+  .schedule-table th:nth-child(1), .schedule-table td:nth-child(1) { width: 23%; }
+  .schedule-table th:nth-child(2), .schedule-table td:nth-child(2) { width: 20%; }
+  .schedule-table th:nth-child(3), .schedule-table td:nth-child(3) { width: 15%; }
+  .schedule-table th:nth-child(4), .schedule-table td:nth-child(4) { width: 24%; }
+  .schedule-table th:nth-child(5), .schedule-table td:nth-child(5) { width: 18%; }
+  .schedule-table .row-actions { flex-wrap: nowrap; white-space: nowrap; }
+}
 .schedule-drawer { position: fixed; z-index: 10; top: 0; right: 0; display: flex; width: min(100%, 440px); min-height: 100vh; flex-direction: column; padding: 32px; border-left: 1px solid #2b3139; background: #171b20; box-shadow: -12px 0 32px rgb(0 0 0 / 25%); }
 .drawer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .drawer-heading h2 { margin: 0; color: #f5f5f5; font-size: 22px; }

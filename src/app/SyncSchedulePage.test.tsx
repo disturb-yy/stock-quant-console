@@ -60,4 +60,23 @@ describe('SyncSchedulePage', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith('schedule-1'))
   })
+
+  it('keeps the plan row visible while toggling a schedule', async () => {
+    let resolveReload: ((value: ReturnType<typeof listResponse>) => void) | undefined
+    const list = vi.spyOn(scheduleApi, 'listSchedules')
+      .mockResolvedValueOnce(listResponse())
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveReload = resolve }))
+    const update = vi.spyOn(scheduleApi, 'updateSchedule').mockResolvedValue({ ...schedule, enabled: false, next_run_at: null })
+    render(<SyncSchedulePage />)
+
+    await screen.findAllByText('股票基础资料')
+    fireEvent.click(screen.getByRole('button', { name: '停用' }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith('schedule-1', { enabled: false }))
+    expect(screen.queryByText('正在加载同步计划…')).not.toBeInTheDocument()
+    expect(screen.getByText('停用')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '启用' })).toBeInTheDocument()
+    expect(list).toHaveBeenCalledTimes(1)
+    resolveReload?.(listResponse([{ ...schedule, enabled: false, next_run_at: null }]))
+  })
 })

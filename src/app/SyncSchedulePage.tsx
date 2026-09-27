@@ -120,16 +120,21 @@ export function SyncSchedulePage() {
     setSaving(true); setFormError(undefined)
     try {
       const request = { target: form.target, frequency: 'daily' as const, run_at: form.runAt, timezone: 'Asia/Shanghai' as const, enabled: form.enabled }
-      if (editing) await scheduleApi.updateSchedule(editing.schedule_id, request)
-      else await scheduleApi.createSchedule(request)
+      if (editing) {
+        const updated = await scheduleApi.updateSchedule(editing.schedule_id, request)
+        setItems((current) => current.map((item) => item.schedule_id === updated.schedule_id ? updated : item))
+      } else await scheduleApi.createSchedule(request)
       setDrawerOpen(false)
-      await loadSchedules(pagination.page)
+      if (!editing) await loadSchedules(pagination.page)
     } catch (reason) { setFormError(apiErrorMessage(reason)) } finally { setSaving(false) }
   }
 
   const toggle = async (schedule: SyncSchedule) => {
     setActionId(schedule.schedule_id); setError(undefined)
-    try { await scheduleApi.updateSchedule(schedule.schedule_id, { enabled: !schedule.enabled }); await loadSchedules(pagination.page) } catch (reason) { setError(apiErrorMessage(reason)) } finally { setActionId(null) }
+    try {
+      const updated = await scheduleApi.updateSchedule(schedule.schedule_id, { enabled: !schedule.enabled })
+      setItems((current) => current.map((item) => item.schedule_id === updated.schedule_id ? updated : item))
+    } catch (reason) { setError(apiErrorMessage(reason)) } finally { setActionId(null) }
   }
 
   const remove = async (schedule: SyncSchedule) => {
