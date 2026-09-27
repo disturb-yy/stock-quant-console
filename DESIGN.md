@@ -159,6 +159,32 @@ AppShell
 - 宽屏内边距为 28px，中等宽度收缩为 20px；960px 以下顶栏间距收缩为 16px，一级导航项最小宽度收缩为 52px。
 - 窄屏顶部栏允许换行，不能隐藏或收起“股票、任务、计划”等核心入口；页签右侧的上下文说明在窄屏隐藏，不影响页面切换。
 
+### 统一页面结构与数据列表规范
+
+现有业务页和后续新增页面固定使用以下页面语法，避免在每个页面重新决定标题、列表和分页的间距：
+
+```text
+AppShell
+└── MainContent
+    ├── PageHeader
+    ├── ErrorBanner（适用时）
+    └── Panel
+        ├── SectionHeading
+        ├── Toolbar / State
+        ├── DataTable（适用时）
+        └── PaginationBar（服务端分页列表适用时）
+```
+
+- `PageHeader` 统一承载英文眉题、中文页面标题、说明文字和右侧主操作或运行模式提示；页面不得重新定义一套标题头间距。
+- `data-table` 是所有数据表的基础类，统一表头、单元格内边距、分隔线和首尾列留白；页面只增加列宽、数值对齐、冻结列和窄屏呈现等局部规则。
+- 表格操作列必须保留原生 `td` 的表格布局，按钮排列放进 `task-actions`、`schedule-actions` 等单元格内部容器，禁止直接给 `td` 设置 `display: flex`。
+- `PaginationBar` 是服务端分页列表的唯一分页格式，固定顺序为：`共 N 条`、`每页 [N 条]`、`上一页`、`第 X 页 / 共 Y 页`、`下一页`。页码从 1 开始，切换每页条数回到第 1 页，加载中禁用所有分页控件。
+- 分页默认值沿用数据语义：股票目录为 20 条/页，任务和计划为 10 条/页；可选值分别为股票目录 `20/30/50`、任务和计划 `10/20/50`，最大值不超过接口契约的 50。
+- 概览页的最近任务是摘要快照，股票详情的历史日线是当前查询结果明细；两者不增加分页条。新增页面只有在 API 返回服务端 `pagination` 时才接入 `PaginationBar`，不得用前端截断冒充分页。
+- 窄屏分页条允许换行，摘要独占一行，控件保持可见且可触达；数据表按页面语义横向滚动或转换为标签-值布局，不通过压缩关键列来“对齐”。
+
+当前共享实现位于 [PageHeader.tsx](/home/jadon/coding/stock-quant-console/src/components/ui/PageHeader.tsx)、[PaginationBar.tsx](/home/jadon/coding/stock-quant-console/src/components/ui/PaginationBar.tsx) 和 [styles.css](/home/jadon/coding/stock-quant-console/src/styles.css)。新增页面完成前应先复用这两个组件和 `data-table` 基线，再补充页面特有规则。
+
 ## 基础组件规则
 
 ### 按钮
@@ -189,6 +215,13 @@ AppShell
 - 行使用细线分隔，不使用大面积红绿背景制造情绪。
 - 价格、比例、日期和统计值使用等宽数字或 `tabular-nums`。
 - 小屏幕必要时横向滚动，不能强行压缩关键列和文字。
+
+### 分页
+
+- 服务端列表统一使用 `PaginationBar`，不在业务页面内重复实现上一页、下一页和页码选择器。
+- 分页请求必须把当前页和每页条数原样传给真实 API；改变筛选、排序或每页条数时回到第 1 页。
+- 总数为 0 时保留空状态语义，不渲染无意义的页码列表；列表有数据时显示完整摘要和页码范围。
+- 分页控件的禁用状态只表达当前边界或请求进行中，不通过闪烁、整表卸载或瞬时空白反馈加载。
 
 ### 表单
 
@@ -266,6 +299,7 @@ AppShell
 
 - [main.tsx](/home/jadon/coding/stock-quant-console/src/main.tsx) 中的 React、TDesign `ConfigProvider` 和全局 TDesign 样式入口；
 - [AppShell.tsx](/home/jadon/coding/stock-quant-console/src/app/AppShell.tsx) 中的两层导航、页签激活规则、路由入口和运行配置提示；
+- [PageHeader.tsx](/home/jadon/coding/stock-quant-console/src/components/ui/PageHeader.tsx) 和 [PaginationBar.tsx](/home/jadon/coding/stock-quant-console/src/components/ui/PaginationBar.tsx) 中的共享页面头与服务端分页格式；
 - [App.tsx](/home/jadon/coding/stock-quant-console/src/app/App.tsx) 及 `src/pages/` 中的概览、同步任务、计划、股票目录和股票详情页面组合；
 - [styles.css](/home/jadon/coding/stock-quant-console/src/styles.css) 中的工作台顶栏、页签栏、内容宽度、响应式排布和焦点样式；
 - [health.ts](/home/jadon/coding/stock-quant-console/src/api/health.ts) 中的相对路径请求、响应校验、Loading、Error 和重试状态。
@@ -298,3 +332,4 @@ AppShell
 - 2026-09-25：将外部金融平台研究逻辑转换为量策的中文系统字体、A 股红涨绿跌语义和真实数据边界；不复制外部专有资产。
 - 2026-09-25：明确当前启动壳层只是基础联通页面，正式业务页面需在产品设计、API 契约和验收确认后实现。
 - 2026-09-27：同步 EPIC-001 两层工作台导航规格，固定“市场”一级导航及“概览、股票、任务、计划”二级页签、路由映射和窄屏排布；股票详情沿用“股票”页签。
+- 2026-09-27：固化现有页面的 `PageHeader`、`data-table` 和 `PaginationBar` 共享规则；统一服务端分页文案、页码选择、每页条数和加载禁用行为，概览摘要与股票详情明细明确为不分页例外。

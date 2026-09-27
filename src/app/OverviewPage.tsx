@@ -9,6 +9,7 @@ import {
   type SyncTaskListResponse,
   type SyncTaskSummary,
 } from '../api/syncTasks'
+import { PageHeader } from '../components/ui/PageHeader'
 import { useRuntimeConfig } from './RuntimeConfigContext'
 
 const targetLabels: Record<SyncTaskSummary['target'], string> = {
@@ -87,7 +88,7 @@ function OverviewContent({ data }: { data: OverviewData }) {
       <section className="panel overview-tasks-panel" aria-labelledby="overview-tasks-title">
         <div className="section-heading"><div><p className="eyebrow">TASK SNAPSHOT</p><h2 id="overview-tasks-title">最近同步任务</h2></div><a className="text-button" href="/">查看全部任务 →</a></div>
         {data.tasks.items.length === 0 ? <p className="state-message">暂无同步任务，请进入任务页发起数据同步。</p> : (
-          <div className="task-table-wrap"><table className="task-table"><caption className="sr-only">最近同步任务</caption><thead><tr><th>目标</th><th>状态</th><th>来源</th><th>更新时间</th></tr></thead><tbody>
+          <div className="task-table-wrap"><table className="data-table task-table"><caption className="sr-only">最近同步任务</caption><thead><tr><th>目标</th><th>状态</th><th>来源</th><th>更新时间</th></tr></thead><tbody>
             {data.tasks.items.map((task) => <tr key={task.task_id}><td data-label="目标">{targetLabels[task.target]}</td><td data-label="状态"><span className={`status status-${task.status}`}>{statusLabels[task.status]}</span></td><td data-label="来源">{sourceLabel(task)}</td><td data-label="更新时间">{formatTimestamp(task.updated_at)}</td></tr>)}
           </tbody></table></div>
         )}
@@ -118,7 +119,7 @@ export function OverviewPage() {
 
   return (
     <main className="app-shell overview-page">
-      <header className="page-header"><div><p className="eyebrow">MARKET / OVERVIEW</p><h1>研究概览</h1><p>从数据覆盖和同步任务进入 A 股研究工作流，当前页面只展示已接入的真实数据。</p></div>{config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>}</header>
+      <PageHeader aside={config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>} description="从数据覆盖和同步任务进入 A 股研究工作流，当前页面只展示已接入的真实数据。" eyebrow="MARKET / OVERVIEW" title="研究概览" />
       {loading && <section className="panel overview-state-panel"><p className="state-message" role="status">正在加载研究概览…</p></section>}
       {!loading && error && <div className="error-banner" role="alert"><span>{error}</span><button className="text-button" onClick={() => setRetryToken((value) => value + 1)} type="button">重新加载</button></div>}
       {!loading && !error && data && <OverviewContent data={data} />}

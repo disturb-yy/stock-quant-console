@@ -155,7 +155,7 @@ function DailyBars({ bars, available }: { bars: StockDailyBar[]; available: bool
             <StockKLineChart bars={bars} />
           </div>
           <div className="stock-data-table-wrap">
-            <table className="stock-data-table">
+            <table className="data-table stock-data-table">
               <caption className="sr-only">历史日线数据</caption>
               <thead><tr><th>交易日</th><th>开盘</th><th>最高</th><th>最低</th><th>收盘</th><th>成交量</th></tr></thead>
               <tbody>{tableBars.map((bar) => {

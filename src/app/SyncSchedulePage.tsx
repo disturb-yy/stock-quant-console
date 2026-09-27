@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ScheduleApiError, scheduleApi, type SyncSchedule } from '../api/syncSchedules'
+import { PageHeader } from '../components/ui/PageHeader'
+import { PaginationBar } from '../components/ui/PaginationBar'
 import type { SyncTarget } from '../api/syncTasks'
 
 const targetLabels: Record<SyncTarget, string> = {
@@ -15,6 +17,7 @@ const runStatusLabels: Record<string, string> = {
 type ScheduleFormState = { target: SyncTarget; runAt: string; enabled: boolean }
 
 const initialForm: ScheduleFormState = { target: 'basic_info', runAt: '02:00', enabled: true }
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 function formatTimestamp(value: string | null): string {
   if (!value) return '—'
@@ -71,9 +74,8 @@ function ScheduleList({
   onToggle: (schedule: SyncSchedule) => void
   onDelete: (schedule: SyncSchedule) => void
 }) {
-  if (loading) return <p className="state-message">正在加载同步计划…</p>
-  if (items.length === 0) return <p className="state-message">暂无同步计划，请先新建一个每日计划。</p>
-  return <div className="schedule-table-wrap"><table className="schedule-table"><caption className="sr-only">同步计划列表</caption><thead><tr><th>目标</th><th>每日执行时间</th><th>状态</th><th>下一次执行</th><th>操作</th></tr></thead><tbody>{items.map((schedule) => <tr key={schedule.schedule_id}><td data-label="目标">{targetLabels[schedule.target]}</td><td data-label="每日执行时间"><strong>{schedule.run_at}</strong><small>{schedule.timezone}</small></td><td data-label="状态"><span className={`status schedule-status-${schedule.enabled ? 'enabled' : 'disabled'}`}>{schedule.enabled ? '启用' : '停用'}</span></td><td data-label="下一次执行">{schedule.enabled ? formatTimestamp(schedule.next_run_at) : '—'}</td><td data-label="操作"><div className="schedule-actions"><button className="text-button" onClick={() => onEdit(schedule)} type="button">编辑</button><button className="text-button" disabled={actionId === schedule.schedule_id} onClick={() => onToggle(schedule)} type="button">{actionId === schedule.schedule_id ? '处理中…' : schedule.enabled ? '停用' : '启用'}</button><button className="text-button danger-action" disabled={actionId === schedule.schedule_id} onClick={() => onDelete(schedule)} type="button">删除</button></div></td></tr>)}</tbody></table></div>
+  if (items.length === 0) return <p className="state-message">{loading ? '正在加载同步计划…' : '暂无同步计划，请先新建一个每日计划。'}</p>
+  return <div className="schedule-table-wrap"><table aria-busy={loading} className="data-table schedule-table"><caption className="sr-only">同步计划列表</caption><thead><tr><th>目标</th><th>每日执行时间</th><th>状态</th><th>下一次执行</th><th>操作</th></tr></thead><tbody>{loading ? <tr><td colSpan={5}><span className="table-loading-state" role="status">正在更新同步计划…</span></td></tr> : items.map((schedule) => <tr key={schedule.schedule_id}><td data-label="目标">{targetLabels[schedule.target]}</td><td data-label="每日执行时间"><strong>{schedule.run_at}</strong><small>{schedule.timezone}</small></td><td data-label="状态"><span className={`status schedule-status-${schedule.enabled ? 'enabled' : 'disabled'}`}>{schedule.enabled ? '启用' : '停用'}</span></td><td data-label="下一次执行">{schedule.enabled ? formatTimestamp(schedule.next_run_at) : '—'}</td><td data-label="操作"><div className="schedule-actions"><button className="text-button" onClick={() => onEdit(schedule)} type="button">编辑</button><button className="text-button" disabled={actionId === schedule.schedule_id} onClick={() => onToggle(schedule)} type="button">{actionId === schedule.schedule_id ? '处理中…' : schedule.enabled ? '停用' : '启用'}</button><button className="text-button danger-action" disabled={actionId === schedule.schedule_id} onClick={() => onDelete(schedule)} type="button">删除</button></div></td></tr>)}</tbody></table></div>
 }
 
 function LatestScheduleRun({ schedule }: { schedule: SyncSchedule | null }) {
@@ -92,11 +94,11 @@ export function SyncSchedulePage() {
   const [saving, setSaving] = useState(false)
   const [actionId, setActionId] = useState<string | null>(null)
 
-  const loadSchedules = useCallback(async (page: number) => {
+  const loadSchedules = useCallback(async (page: number, pageSize = 10) => {
     setLoading(true)
     setError(undefined)
     try {
-      const response = await scheduleApi.listSchedules(page, 10)
+      const response = await scheduleApi.listSchedules(page, pageSize)
       setItems(response.items)
       setPagination(response.pagination)
     } catch (reason) {
@@ -125,7 +127,7 @@ export function SyncSchedulePage() {
         setItems((current) => current.map((item) => item.schedule_id === updated.schedule_id ? updated : item))
       } else await scheduleApi.createSchedule(request)
       setDrawerOpen(false)
-      if (!editing) await loadSchedules(pagination.page)
+      if (!editing) await loadSchedules(pagination.page, pagination.page_size)
     } catch (reason) { setFormError(apiErrorMessage(reason)) } finally { setSaving(false) }
   }
 
@@ -140,8 +142,8 @@ export function SyncSchedulePage() {
   const remove = async (schedule: SyncSchedule) => {
     if (!window.confirm(`确认删除「${targetLabels[schedule.target]}」同步计划吗？历史同步任务不会被删除。`)) return
     setActionId(schedule.schedule_id); setError(undefined)
-    try { await scheduleApi.deleteSchedule(schedule.schedule_id); await loadSchedules(pagination.page) } catch (reason) { setError(apiErrorMessage(reason)) } finally { setActionId(null) }
+    try { await scheduleApi.deleteSchedule(schedule.schedule_id); await loadSchedules(pagination.page, pagination.page_size) } catch (reason) { setError(apiErrorMessage(reason)) } finally { setActionId(null) }
   }
 
-  return <main className="app-shell"><header className="page-header"><div><p className="eyebrow">SCHEDULED SYNC</p><h1>同步计划管理</h1><p>定时计划会创建同步任务，具体任务状态可在 A 股数据同步中查看。</p></div><button aria-label="新建计划" className="primary-button" onClick={openCreate} type="button">＋ 新建计划</button></header>{error && <div className="error-banner" role="alert"><span>{error}</span><button className="text-button" onClick={() => void loadSchedules(pagination.page)} type="button">重新加载</button></div>}<section className="panel schedules-panel" aria-labelledby="schedules-title"><div className="section-heading"><div><p className="eyebrow">DAILY SCHEDULES</p><h2 id="schedules-title">计划列表</h2></div><span className="muted-text">共 {pagination.total} 条</span></div><ScheduleList actionId={actionId} items={items} loading={loading} onDelete={(schedule) => void remove(schedule)} onEdit={openEdit} onToggle={(schedule) => void toggle(schedule)} /></section><LatestScheduleRun schedule={latestSchedule} />{drawerOpen && <ScheduleForm editing={editing !== null} error={formError} form={form} saving={saving} onChange={setForm} onClose={() => setDrawerOpen(false)} onSubmit={() => void save()} />}</main>
+  return <main className="app-shell"><PageHeader aside={<button aria-label="新建计划" className="primary-button" onClick={openCreate} type="button">＋ 新建计划</button>} description="定时计划会创建同步任务，具体任务状态可在 A 股数据同步中查看。" eyebrow="SCHEDULED SYNC" title="同步计划管理" />{error && <div className="error-banner" role="alert"><span>{error}</span><button className="text-button" onClick={() => void loadSchedules(pagination.page, pagination.page_size)} type="button">重新加载</button></div>}<section className="panel schedules-panel" aria-labelledby="schedules-title"><div className="section-heading"><div><p className="eyebrow">DAILY SCHEDULES</p><h2 id="schedules-title">计划列表</h2></div></div><ScheduleList actionId={actionId} items={items} loading={loading} onDelete={(schedule) => void remove(schedule)} onEdit={openEdit} onToggle={(schedule) => void toggle(schedule)} />{items.length > 0 && <PaginationBar loading={loading} onPageChange={(page) => void loadSchedules(page, pagination.page_size)} onPageSizeChange={(pageSize) => void loadSchedules(1, pageSize)} page={pagination.page} pageSize={pagination.page_size} pageSizeOptions={PAGE_SIZE_OPTIONS} total={pagination.total} />}</section><LatestScheduleRun schedule={latestSchedule} />{drawerOpen && <ScheduleForm editing={editing !== null} error={formError} form={form} saving={saving} onChange={setForm} onClose={() => setDrawerOpen(false)} onSubmit={() => void save()} />}</main>
 }

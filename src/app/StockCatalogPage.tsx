@@ -9,6 +9,8 @@ import {
   type StockSortOrder,
 } from '../api/stockCatalog'
 import { SyncApiError } from '../api/syncTasks'
+import { PageHeader } from '../components/ui/PageHeader'
+import { PaginationBar } from '../components/ui/PaginationBar'
 import { useRuntimeConfig } from './RuntimeConfigContext'
 
 const PAGE_SIZE_OPTIONS = [20, 30, 50] as const
@@ -75,18 +77,6 @@ function availabilityLabel(value: StockCatalogItem['availability']['daily_bars']
   return value === 'available' ? '有数据' : '暂无数据'
 }
 
-function PageHeader({ mockMode }: { mockMode: boolean }) {
-  return (
-    <header className="page-header">
-      <div>
-        <h1>已同步股票</h1>
-        <p>查看已同步基础资料的 A 股股票，按名称或标识定位并进入单只股票数据验证。</p>
-      </div>
-      {mockMode && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>}
-    </header>
-  )
-}
-
 type ToolbarProps = {
   keyword: string
   loading: boolean
@@ -145,7 +135,7 @@ type StockCatalogTableProps = {
 function StockCatalogTable({ items, query, loading, loadingMessage, onSortChange, onResetSort }: StockCatalogTableProps) {
   return (
     <div className="stock-catalog-table-wrap">
-      <table className="stock-catalog-table">
+      <table className="data-table stock-catalog-table">
         <caption className="sr-only">已同步股票目录</caption>
         <colgroup><col className="stock-symbol-column" /><col className="stock-name-column" /><col /><col /><col /><col /><col /></colgroup>
         <thead><tr>
@@ -167,19 +157,6 @@ function StockCatalogTable({ items, query, loading, loadingMessage, onSortChange
           ))}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-function Pagination({ query, total, loading, onPageChange, onPageSizeChange }: { query: CatalogQuery; total: number; loading: boolean; onPageChange: (page: number) => void; onPageSizeChange: (pageSize: PageSize) => void }) {
-  const totalPages = Math.max(1, Math.ceil(total / query.page_size))
-  return (
-    <div className="pagination catalog-pagination">
-      <span>共 {total} 条</span>
-      <label><span>每页</span><select aria-label="每页条数" disabled={loading} onChange={(event) => onPageSizeChange(Number(event.target.value) as PageSize)} value={query.page_size}>{PAGE_SIZE_OPTIONS.map((pageSize) => <option key={pageSize} value={pageSize}>{pageSize} 条</option>)}</select></label>
-      <button disabled={query.page <= 1 || loading} onClick={() => onPageChange(query.page - 1)} type="button">上一页</button>
-      <label><select aria-label="页码" disabled={loading} onChange={(event) => onPageChange(Number(event.target.value))} value={query.page}>{Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => <option key={page} value={page}>第 {page} 页</option>)}</select><span aria-live="polite">/ {totalPages} 页</span></label>
-      <button disabled={query.page >= totalPages || loading} onClick={() => onPageChange(query.page + 1)} type="button">下一页</button>
     </div>
   )
 }
@@ -226,13 +203,13 @@ export function StockCatalogPage() {
 
   return (
     <main className="app-shell">
-      <PageHeader mockMode={config?.data_source.mode === 'mock'} />
+      <PageHeader aside={config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>} description="查看已同步基础资料的 A 股股票，按名称或标识定位并进入单只股票数据验证。" title="已同步股票" />
       <section className="panel catalog-panel" aria-labelledby="catalog-title">
         <div className="section-heading catalog-section-heading"><h2 id="catalog-title">股票目录</h2><CatalogToolbar keyword={keyword} loading={loading} onKeywordChange={setKeyword} onSearch={search} /></div>
         {error && <div className="error-banner" role="alert"><span>{error}</span><button className="text-button" onClick={() => setRetryToken((value) => value + 1)} type="button">重新加载</button></div>}
         {loading && items.length === 0 && <p className="state-message" role="status">{hasLoaded ? '正在查询股票目录…' : '正在加载股票目录…'}</p>}
         {!loading && !error && items.length === 0 && <EmptyState searching={Boolean(query.keyword)} onClear={clearSearch} />}
-        {!error && items.length > 0 && <><StockCatalogTable items={items} loading={loading} loadingMessage={hasLoaded ? '正在更新股票目录…' : '正在加载股票目录…'} onResetSort={() => updateQuery({ sort_by: 'symbol', sort_order: 'asc', page: 1 })} onSortChange={(sort_by, sort_order) => updateQuery({ sort_by, sort_order, page: 1 })} query={query} /><Pagination loading={loading} onPageChange={(page) => updateQuery({ page })} onPageSizeChange={(page_size) => updateQuery({ page: 1, page_size })} query={query} total={total} /></>}
+        {!error && items.length > 0 && <><StockCatalogTable items={items} loading={loading} loadingMessage={hasLoaded ? '正在更新股票目录…' : '正在加载股票目录…'} onResetSort={() => updateQuery({ sort_by: 'symbol', sort_order: 'asc', page: 1 })} onSortChange={(sort_by, sort_order) => updateQuery({ sort_by, sort_order, page: 1 })} query={query} /><PaginationBar loading={loading} onPageChange={(page) => updateQuery({ page })} onPageSizeChange={(page_size) => updateQuery({ page: 1, page_size: page_size as PageSize })} page={query.page} pageSize={query.page_size} pageSizeOptions={PAGE_SIZE_OPTIONS} total={total} /></>}
       </section>
     </main>
   )

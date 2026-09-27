@@ -45,23 +45,26 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
 .failure-note { margin: 16px 0 0; line-height: 1.6; }
 .state-message { margin: 0; color: #929aa5; line-height: 1.7; }
 .task-table-wrap { overflow-x: auto; }
-.task-table { width: 100%; border-collapse: collapse; color: #eaecef; font-size: 14px; }
-.task-table th { color: #929aa5; font-size: 12px; font-weight: 600; text-align: left; }
-.task-table th, .task-table td { border-bottom: 1px solid #2b3139; padding: 14px 10px; vertical-align: middle; }
-.task-table th:first-child, .task-table td:first-child { padding-left: 0; }
-.task-table th:last-child, .task-table td:last-child { padding-right: 0; }
+.data-table { width: 100%; border-collapse: collapse; color: #eaecef; font-size: 14px; }
+.data-table th { color: #929aa5; font-size: 12px; font-weight: 600; text-align: left; }
+.data-table th, .data-table td { border-bottom: 1px solid #2b3139; padding: 14px 10px; vertical-align: middle; }
+.data-table th:first-child, .data-table td:first-child { padding-left: 0; }
+.data-table th:last-child, .data-table td:last-child { padding-right: 0; }
 .task-table tbody tr.is-selected { background: #252b31; }
 .status { display: inline-flex; align-items: center; gap: 6px; color: #eaecef; font-weight: 600; }
 .status::before { width: 7px; height: 7px; border-radius: 50%; background: #929aa5; content: ""; }
 .status-pending::before, .status-running::before, .status-retrying::before { background: #fcd535; }
 .status-succeeded::before { background: #2f855a; }
 .status-failed::before { background: #c53030; }
-.row-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.task-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .text-button { border: 0; padding: 4px 0; color: #fcd535; background: transparent; font-size: 13px; }
 .text-button:hover:not(:disabled) { color: #f0b90b; text-decoration: underline; }
 .danger-action { color: #ff9b9b; }
-.pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 18px; color: #929aa5; font-size: 13px; }
-.pagination button { min-height: 34px; border: 1px solid #2b3139; border-radius: 6px; padding: 0 12px; color: #eaecef; background: #2b3139; }
+.pagination-bar { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 18px; color: #929aa5; font-size: 13px; }
+.pagination-summary { margin-right: auto; white-space: nowrap; }
+.pagination-bar label { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.pagination-bar select { min-height: 34px; border: 1px solid #2b3139; border-radius: 6px; padding: 0 8px; color: #eaecef; background: #2b3139; }
+.pagination-bar button { min-height: 34px; border: 1px solid #2b3139; border-radius: 6px; padding: 0 12px; color: #eaecef; background: #2b3139; }
 .detail-panel { margin-bottom: 16px; }
 .detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; }
 .detail-grid div { border-left: 2px solid #2b3139; padding-left: 12px; }
@@ -73,11 +76,6 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
 .latest-result p { margin: 10px 0 0; color: #929aa5; font-size: 13px; }
 .schedules-panel { padding: 24px; margin-bottom: 16px; }
 .schedule-table-wrap { overflow-x: auto; }
-.schedule-table { width: 100%; border-collapse: collapse; color: #eaecef; font-size: 14px; }
-.schedule-table th { color: #929aa5; font-size: 12px; font-weight: 600; text-align: left; }
-.schedule-table th, .schedule-table td { border-bottom: 1px solid #2b3139; padding: 14px 10px; vertical-align: middle; }
-.schedule-table th:first-child, .schedule-table td:first-child { padding-left: 0; }
-.schedule-table th:last-child, .schedule-table td:last-child { padding-right: 0; }
 .schedule-table td strong, .schedule-table td small { display: block; }
 .schedule-table td small { margin-top: 5px; color: #929aa5; font-size: 12px; }
 .schedule-actions { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -206,10 +204,6 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
 .catalog-state { padding: 40px 12px; border: 1px dashed #3b424c; text-align: center; }
 .catalog-state h3 { margin: 0; color: #eaecef; font-size: 18px; }
 .catalog-state p { margin: 10px 0 16px; color: #929aa5; line-height: 1.6; }
-.catalog-pagination { justify-content: flex-end; }
-.catalog-pagination span:first-child { margin-right: auto; }
-.catalog-pagination label { display: inline-flex; align-items: center; gap: 8px; color: #929aa5; font-size: 13px; }
-.catalog-pagination select { min-height: 34px; border: 1px solid #2b3139; border-radius: 6px; padding: 0 8px; color: #eaecef; background: #2b3139; }
 
 @media (max-width: 760px) {
   .app-shell { width: min(100% - 24px, 640px); padding-top: 28px; }
@@ -229,8 +223,8 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
   .catalog-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
   .catalog-search-field { width: auto; }
   .catalog-toolbar .primary-button { width: auto; }
-  .catalog-pagination { align-items: stretch; flex-wrap: wrap; justify-content: space-between; }
-  .catalog-pagination span:first-child { width: 100%; margin-right: 0; }
+  .pagination-bar { align-items: stretch; justify-content: flex-start; }
+  .pagination-summary { flex-basis: 100%; margin-right: 0; }
   .schedules-panel { padding: 18px; }
   .date-fields, .detail-grid { grid-template-columns: 1fr; }
   .task-table thead { display: none; }
@@ -238,8 +232,8 @@ legend { margin-bottom: 12px; color: #eaecef; font-size: 14px; font-weight: 600;
   .task-table tr { border-bottom: 1px solid #2b3139; padding: 12px 0; }
   .task-table td, .task-table th, .task-table td:first-child, .task-table td:last-child { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border: 0; padding: 6px 0; text-align: right; }
   .task-table td::before { color: #929aa5; content: attr(data-label); font-size: 12px; text-align: left; }
-  .task-table .row-actions { justify-content: flex-end; }
-  .task-table .row-actions::before { margin-right: auto; }
+  .task-table .task-actions { justify-content: flex-end; }
+  .task-table td[data-label="操作"]::before { margin-right: auto; }
   .schedule-table thead { display: none; }
   .schedule-table, .schedule-table tbody, .schedule-table tr, .schedule-table td { display: block; width: 100%; }
   .schedule-table tr { border-bottom: 1px solid #2b3139; padding: 12px 0; }
