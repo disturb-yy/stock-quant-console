@@ -11,6 +11,7 @@ import { AppShell } from './AppShell'
 import { OverviewPage } from './OverviewPage'
 import { StockCatalogPage } from './StockCatalogPage'
 import { StockDataPage } from './StockDataPage'
+import { SyncSchedulePage } from './SyncSchedulePage'
 
 const PAGE_SIZE = 10
 
@@ -253,7 +254,7 @@ function SyncWorkspace() {
   }
 
   return (
-    <main className="app-shell">
+      <main className="app-shell">
       <header className="page-header"><div><p className="eyebrow">A-SHARE RESEARCH DATA</p><h1>A 股数据同步</h1><p>批量同步基础资料与历史日线，完成后追踪任务状态和数据来源。</p></div>{config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>}</header>
       <SyncForm target={target} startDate={startDate} endDate={endDate} submitting={submitting} error={formError} onTargetChange={(value) => { setTarget(value); if (value === 'basic_info') { setStartDate(''); setEndDate('') } }} onStartDateChange={setStartDate} onEndDateChange={setEndDate} onSubmit={() => void submit()} />
       {listError && <div className="error-banner" role="alert"><span>{listError}</span><button className="text-button" onClick={() => void loadTasks(pagination.page)} type="button">重新加载</button></div>}
@@ -278,6 +279,8 @@ export function App() {
     ? <OverviewPage />
       : window.location.pathname === '/stocks'
         ? <StockCatalogPage />
-      : <SyncWorkspace />
+        : window.location.pathname === '/sync-schedules'
+          ? <SyncSchedulePage />
+        : <SyncWorkspace />
   return <AppShell>{page}</AppShell>
 }

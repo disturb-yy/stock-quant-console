@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react'
 import { RuntimeConfigProvider, useRuntimeConfig } from './RuntimeConfigContext'
 
-type WorkspacePage = 'overview' | 'stocks' | 'tasks'
+type WorkspacePage = 'overview' | 'stocks' | 'tasks' | 'schedules'
 
 const pageLinks: Array<{ key: WorkspacePage; label: string; href: string }> = [
   { key: 'overview', label: '概览', href: '/overview' },
   { key: 'stocks', label: '股票', href: '/stocks' },
   { key: 'tasks', label: '任务', href: '/' },
+  { key: 'schedules', label: '计划', href: '/sync-schedules' },
 ]
 
 function currentPage(pathname: string): WorkspacePage {
   if (pathname === '/overview') return 'overview'
   if (pathname === '/stocks' || pathname.startsWith('/stocks/')) return 'stocks'
+  if (pathname === '/sync-schedules') return 'schedules'
   return 'tasks'
 }
 

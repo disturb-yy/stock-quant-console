@@ -23,8 +23,12 @@
 | `src/api/runtimeConfig.test.ts` | 覆盖运行时配置的 Mock、真实请求、契约校验和错误边界。 |
 | `src/api/syncTasks.ts` | 提供 FEAT-001 同步任务的契约类型、真实相对路径请求、响应校验和显式 Mock 适配器。 |
 | `src/api/syncTasks.test.ts` | 覆盖同步任务 Mock、契约校验、错误归类和真实请求路径。 |
+| `src/api/syncSchedules.ts` | 提供 FEAT-002 同步计划 CRUD 契约、真实相对路径请求和显式 Mock 适配器。 |
+| `src/api/syncSchedules.test.ts` | 覆盖同步计划 Mock、契约校验、冲突错误和真实请求路径。 |
 | `src/app/App.test.tsx` | 覆盖同步页面加载、空态、日期校验、创建、详情、冲突和重试状态。 |
 | `src/app/StockCatalogPage.test.tsx` | 覆盖股票目录加载、搜索、排序、分页、空态、无结果、错误重试和详情入口。 |
+| `src/app/SyncSchedulePage.tsx` | 渲染同步计划列表、创建/编辑抽屉、启停、删除及加载、空、错误和冲突状态。 |
+| `src/app/SyncSchedulePage.test.tsx` | 覆盖同步计划管理页的主要加载、空态、创建、错误、冲突和删除状态。 |
 | `src/styles.css` | 同步工作台的深色研究终端布局、状态语义色和窄屏样式。 |
 | `vite.config.ts` | 配置 React 插件和 `/api` 开发代理。 |
 | `vitest.config.ts` | 配置 jsdom 测试环境与测试初始化。 |
