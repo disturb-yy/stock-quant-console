@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  getSyncApiMode,
   SyncApiError,
   syncTasksApi,
   type SyncTask,
   type SyncTaskSummary,
   type SyncTarget,
 } from '../api/syncTasks'
+import { useRuntimeConfig } from './RuntimeConfigContext'
+import { AppShell } from './AppShell'
+import { OverviewPage } from './OverviewPage'
+import { StockCatalogPage } from './StockCatalogPage'
+import { StockDataPage } from './StockDataPage'
 
 const PAGE_SIZE = 10
 
@@ -190,7 +194,7 @@ function LatestResult({ task }: { task: SyncTaskSummary | null }) {
   )
 }
 
-export function App() {
+function SyncWorkspace() {
   const [target, setTarget] = useState<SyncTarget>('basic_info')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -204,7 +208,7 @@ export function App() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string>()
   const [retryingId, setRetryingId] = useState<string | null>(null)
-  const mode = getSyncApiMode()
+  const { config } = useRuntimeConfig()
 
   const loadTasks = useCallback(async (page: number) => {
     setListLoading(true)
@@ -250,7 +254,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <header className="page-header"><div><p className="eyebrow">A-SHARE RESEARCH DATA</p><h1>A 股数据同步</h1><p>批量同步基础资料与历史日线，完成后追踪任务状态和数据来源。</p></div>{mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>}</header>
+      <header className="page-header"><div><p className="eyebrow">A-SHARE RESEARCH DATA</p><h1>A 股数据同步</h1><p>批量同步基础资料与历史日线，完成后追踪任务状态和数据来源。</p></div>{config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>}</header>
       <SyncForm target={target} startDate={startDate} endDate={endDate} submitting={submitting} error={formError} onTargetChange={(value) => { setTarget(value); if (value === 'basic_info') { setStartDate(''); setEndDate('') } }} onStartDateChange={setStartDate} onEndDateChange={setEndDate} onSubmit={() => void submit()} />
       {listError && <div className="error-banner" role="alert"><span>{listError}</span><button className="text-button" onClick={() => void loadTasks(pagination.page)} type="button">重新加载</button></div>}
       <section className="panel tasks-panel" aria-labelledby="tasks-title"><div className="section-heading"><div><p className="eyebrow">TASK MONITOR</p><h2 id="tasks-title">当前任务与最近历史</h2></div><span className="muted-text">共 {pagination.total} 条</span></div><TaskList items={items} loading={listLoading} retryingId={retryingId} selectedId={selectedTask?.task_id ?? null} onView={(taskId) => void viewTask(taskId)} onRetry={(taskId) => void retry(taskId)} /><div className="pagination"><button disabled={pagination.page <= 1 || listLoading} onClick={() => void loadTasks(pagination.page - 1)} type="button">上一页</button><span>第 {pagination.page} 页</span><button disabled={pagination.page * pagination.page_size >= pagination.total || listLoading} onClick={() => void loadTasks(pagination.page + 1)} type="button">下一页</button></div></section>
@@ -258,4 +262,22 @@ export function App() {
       <LatestResult task={latestTask} />
     </main>
   )
+}
+
+function stockDataSymbolFromPath(): string | null {
+  const match = window.location.pathname.match(/^\/stocks\/([^/]+)\/data$/)
+  if (!match) return null
+  try { return decodeURIComponent(match[1]) } catch { return match[1] }
+}
+
+export function App() {
+  const symbol = stockDataSymbolFromPath()
+  const page = symbol !== null
+    ? <StockDataPage symbol={symbol} />
+    : window.location.pathname === '/overview'
+    ? <OverviewPage />
+      : window.location.pathname === '/stocks'
+        ? <StockCatalogPage />
+      : <SyncWorkspace />
+  return <AppShell>{page}</AppShell>
 }
