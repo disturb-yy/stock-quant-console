@@ -11,6 +11,7 @@ import { AppShell } from './AppShell'
 import { OverviewPage } from './OverviewPage'
 import { StockCatalogPage } from './StockCatalogPage'
 import { StockDataPage } from './StockDataPage'
+import { StockScreenerPage } from './StockScreenerPage'
 import { SyncSchedulePage } from './SyncSchedulePage'
 import { PageHeader } from '../components/ui/PageHeader'
 import { PaginationBar } from '../components/ui/PaginationBar'
@@ -21,6 +22,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const targetLabels: Record<SyncTarget, string> = {
   basic_info: '股票基础资料',
   daily_bars: '历史日线行情',
+  category_members: '分类与股票成分',
   all: '全部数据',
 }
 
@@ -53,7 +55,7 @@ function errorMessage(error: unknown): string {
 }
 
 function validateDates(target: SyncTarget, startDate: string, endDate: string): string | undefined {
-  if (target === 'basic_info') return undefined
+  if (target !== 'daily_bars' && target !== 'all') return undefined
   if (!startDate || !endDate) return '请选择历史日线的开始日期和结束日期'
   if (startDate > endDate) return '结束日期不能早于开始日期'
   return undefined
@@ -72,7 +74,7 @@ type SyncFormProps = {
 }
 
 function SyncForm(props: SyncFormProps) {
-  const showDates = props.target !== 'basic_info'
+  const showDates = props.target === 'daily_bars' || props.target === 'all'
   return (
     <section className="panel sync-form-panel" aria-labelledby="manual-sync-title">
       <div className="section-heading">
@@ -245,7 +247,7 @@ function SyncWorkspace() {
     setSubmitting(true)
     setFormError(undefined)
     try {
-      const task = await syncTasksApi.createTask({ target, ...(target !== 'basic_info' ? { start_date: startDate, end_date: endDate } : {}) })
+      const task = await syncTasksApi.createTask({ target, ...(target === 'daily_bars' || target === 'all' ? { start_date: startDate, end_date: endDate } : {}) })
       setSelectedTask(task)
       await loadTasks(pagination.page, pagination.page_size)
     } catch (error) { setFormError(errorMessage(error)) } finally { setSubmitting(false) }
@@ -259,7 +261,7 @@ function SyncWorkspace() {
 
   return (
       <main className="app-shell">
-      <PageHeader aside={config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>} description="批量同步基础资料与历史日线，完成后追踪任务状态和数据来源。" eyebrow="A-SHARE RESEARCH DATA" title="A 股数据同步" />
+      <PageHeader aside={config?.data_source.mode === 'mock' && <div className="mode-banner" role="status">开发 Mock 模式<br /><small>仅用于页面开发与测试</small></div>} description="批量同步基础资料、历史日线和申万行业成分，完成后追踪任务状态和数据来源。" eyebrow="A-SHARE RESEARCH DATA" title="A 股数据同步" />
       <SyncForm target={target} startDate={startDate} endDate={endDate} submitting={submitting} error={formError} onTargetChange={(value) => { setTarget(value); if (value === 'basic_info') { setStartDate(''); setEndDate('') } }} onStartDateChange={setStartDate} onEndDateChange={setEndDate} onSubmit={() => void submit()} />
       {listError && <div className="error-banner" role="alert"><span>{listError}</span><button className="text-button" onClick={() => void loadTasks(pagination.page, pagination.page_size)} type="button">重新加载</button></div>}
       <section className="panel tasks-panel" aria-labelledby="tasks-title"><div className="section-heading"><div><p className="eyebrow">TASK MONITOR</p><h2 id="tasks-title">当前任务与最近历史</h2></div></div><TaskList items={items} loading={listLoading} retryingId={retryingId} selectedId={selectedTask?.task_id ?? null} onView={(taskId) => void viewTask(taskId)} onRetry={(taskId) => void retry(taskId)} />{items.length > 0 && <PaginationBar loading={listLoading} onPageChange={(page) => void loadTasks(page, pagination.page_size)} onPageSizeChange={(pageSize) => void loadTasks(1, pageSize)} page={pagination.page} pageSize={pagination.page_size} pageSizeOptions={PAGE_SIZE_OPTIONS} total={pagination.total} />}</section>
@@ -283,6 +285,8 @@ export function App() {
     ? <OverviewPage />
       : window.location.pathname === '/stocks'
         ? <StockCatalogPage />
+        : window.location.pathname === '/screener'
+          ? <StockScreenerPage />
         : window.location.pathname === '/sync-schedules'
           ? <SyncSchedulePage />
         : <SyncWorkspace />

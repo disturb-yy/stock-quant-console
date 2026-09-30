@@ -93,7 +93,7 @@ function parseSchedule(value: unknown): SyncSchedule {
   if (typeof schedule.enabled !== 'boolean') throw contractError('服务返回的 enabled 字段无效')
   return {
     schedule_id: requiredString(schedule, 'schedule_id'),
-    target: enumValue(schedule, 'target', ['basic_info', 'daily_bars', 'all']),
+    target: enumValue(schedule, 'target', ['basic_info', 'daily_bars', 'category_members', 'all']),
     frequency: enumValue(schedule, 'frequency', SCHEDULE_FREQUENCIES),
     run_at: runAt,
     timezone: enumValue(schedule, 'timezone', ['Asia/Shanghai']),
