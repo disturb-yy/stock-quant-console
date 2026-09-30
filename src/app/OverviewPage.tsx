@@ -15,6 +15,7 @@ import { useRuntimeConfig } from './RuntimeConfigContext'
 const targetLabels: Record<SyncTaskSummary['target'], string> = {
   basic_info: '股票基础资料',
   daily_bars: '历史日线行情',
+  category_members: '分类与股票成分',
   all: '全部数据',
 }
 

@@ -1,4 +1,4 @@
-export const SYNC_TARGETS = ['basic_info', 'daily_bars', 'all'] as const
+export const SYNC_TARGETS = ['basic_info', 'daily_bars', 'category_members', 'all'] as const
 export type SyncTarget = (typeof SYNC_TARGETS)[number]
 
 export const SYNC_TASK_STATUSES = ['pending', 'running', 'retrying', 'succeeded', 'failed'] as const
@@ -284,16 +284,20 @@ function isSyncTarget(value: unknown): value is SyncTarget {
   return typeof value === 'string' && SYNC_TARGETS.includes(value as SyncTarget)
 }
 
+function usesDateRange(target: SyncTarget): boolean {
+  return target === 'daily_bars' || target === 'all'
+}
+
 function validateCreateRequest(request: CreateSyncTaskRequest): void {
   if (typeof request !== 'object' || request === null || !isSyncTarget(request.target)) {
     requestError('同步目标无效', { field: 'target' })
   }
   const hasStart = request.start_date !== undefined
   const hasEnd = request.end_date !== undefined
-  if (request.target === 'basic_info' && (hasStart || hasEnd)) {
-    requestError('基础资料同步不适用日期范围')
+  if (!usesDateRange(request.target) && (hasStart || hasEnd)) {
+    requestError(request.target === 'basic_info' ? '基础资料同步不适用日期范围' : '分类与股票成分同步不适用日期范围')
   }
-  if (request.target !== 'basic_info' && (!isDate(request.start_date) || !isDate(request.end_date))) {
+  if (usesDateRange(request.target) && (!isDate(request.start_date) || !isDate(request.end_date))) {
     requestError('历史日线同步必须提供有效日期范围')
   }
   if (request.start_date && request.end_date && request.start_date > request.end_date) {
@@ -316,7 +320,7 @@ function createBody(request: CreateSyncTaskRequest): string {
   validateCreateRequest(request)
   return JSON.stringify({
     target: request.target,
-    ...(request.target !== 'basic_info' ? { start_date: request.start_date, end_date: request.end_date } : {}),
+    ...(usesDateRange(request.target) ? { start_date: request.start_date, end_date: request.end_date } : {}),
   })
 }
 

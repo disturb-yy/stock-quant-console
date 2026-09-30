@@ -119,6 +119,35 @@ describe('syncTasksApi real adapter', () => {
     expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: 'POST' })
   })
 
+  it('creates category membership sync without a historical date range', async () => {
+    vi.stubEnv('VITE_STOCK_DATA_API_MODE', 'real')
+    const fetchMock = vi.fn().mockResolvedValue(response({ ...taskFixture, target: 'category_members', start_date: null, end_date: null }, 202))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(syncTasksApi.createTask({ target: 'category_members' })).resolves.toMatchObject({ target: 'category_members' })
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/stock/data/sync-tasks', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ target: 'category_members' }),
+    }))
+  })
+
+  it('rejects a date range for category membership sync', async () => {
+    vi.stubEnv('VITE_STOCK_DATA_API_MODE', 'real')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    let failure: unknown
+    try {
+      await syncTasksApi.createTask({ target: 'category_members', start_date: '2026-01-01', end_date: '2026-09-26' })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(SyncApiError)
+    expect(failure).toMatchObject({ category: 'validation', status: 400, code: 'INVALID_REQUEST' })
+    expect((failure as SyncApiError).message).toBe('分类与股票成分同步不适用日期范围')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not fall back to mock when a real request fails', async () => {
     vi.stubEnv('VITE_STOCK_DATA_API_MODE', 'real')
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('network down'))

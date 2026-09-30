@@ -7,6 +7,7 @@ import type { SyncTarget } from '../api/syncTasks'
 const targetLabels: Record<SyncTarget, string> = {
   basic_info: '股票基础资料',
   daily_bars: '历史日线行情',
+  category_members: '分类与股票成分',
   all: '全部数据',
 }
 
@@ -53,7 +54,7 @@ function ScheduleForm({
   return <section className="schedule-drawer" role="dialog" aria-modal="true" aria-labelledby="schedule-form-title">
     <div className="drawer-heading"><div><p className="eyebrow">SCHEDULE CONFIG</p><h2 id="schedule-form-title">{editing ? '编辑同步计划' : '新建同步计划'}</h2></div><button className="text-button" onClick={onClose} type="button">关闭</button></div>
     <div className="schedule-form-fields">
-      <label>同步目标<select aria-label="同步目标" onChange={(event) => onChange({ ...form, target: event.target.value as SyncTarget })} value={form.target}><option value="basic_info">股票基础资料</option><option value="daily_bars">历史日线行情</option><option value="all">全部数据</option></select></label>
+      <label>同步目标<select aria-label="同步目标" onChange={(event) => onChange({ ...form, target: event.target.value as SyncTarget })} value={form.target}><option value="basic_info">股票基础资料</option><option value="daily_bars">历史日线行情</option><option value="category_members">分类与股票成分</option><option value="all">全部数据</option></select></label>
       <label>每日执行时间<input aria-describedby="run-at-hint" aria-label="每日执行时间" onChange={(event) => onChange({ ...form, runAt: event.target.value })} placeholder="HH:mm" type="time" value={form.runAt} /></label>
       <p className="field-hint" id="run-at-hint">每天按 Asia/Shanghai 时区执行</p>
       <div className="readonly-field"><span>时区</span><strong>Asia/Shanghai（由系统决定）</strong></div>
